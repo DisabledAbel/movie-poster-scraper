@@ -1,7 +1,20 @@
 {
+  "version": 3,
   "functions": {
-    "api/*.js": {
-      "runtime": "nodejs20.x"
+    "api/**/*.js": {
+      "runtime": "nodejs20.x",
+      "memory": 1024,
+      "maxDuration": 10
     }
-  }
+  },
+  "rewrites": [
+    {
+      "source": "/poster/:title",
+      "destination": "/api/poster/:title"
+    },
+    {
+      "source": "/poster-img/:title.jpg",
+      "destination": "/api/poster-img/:title"
+    }
+  ]
 }
