@@ -1,6 +1,6 @@
 # Movie Poster Scraper & API
 
-This project provides a **movie poster API** using **Firecrawl** to fetch poster images. It works both **locally** and deployed on **Vercel**, with optional caching for faster access and Plex-friendly URLs.
+This project provides a **movie poster API** using **Firecrawl** to fetch poster images. It works deployed on **Vercel**, with optional caching for faster access and Plex-friendly URLs.
 
 ---
 
@@ -10,75 +10,6 @@ This project provides a **movie poster API** using **Firecrawl** to fetch poster
 * Returns multiple poster URLs as JSON
 * Optional caching for repeated requests
 * CDN-style direct image URL endpoints for Plex or apps
-* Runs locally or on Vercel serverless functions
-
----
-
-## Setup
-
-### 1. Clone the repository
-
-```bash
-git clone https://github.com/DisabledAbel/movie-poster-scraper.git
-cd movie-poster-scraper
-```
-
----
-
-### 2. Install dependencies
-
-```bash
-npm install
-```
-
----
-
-### 3. Configure environment variables
-
-Create a `.env` file in the project root:
-
-```env
-FIRECRAWL_API_KEY=your_firecrawl_api_key
-```
-
-You can obtain a Firecrawl API key from the **Firecrawl dashboard**.
-
----
-
-## Local Development (localhost)
-
-Run the API locally using Vercel CLI:
-
-```bash
-npm install -g vercel
-vercel dev
-```
-
-Your API will be available at:
-
-```text
-http://localhost:3000/api/scrape
-http://localhost:3000/api/poster/{movie-title}
-http://localhost:3000/api/poster-img/{movie-title}.jpg
-```
-
-**Example:**
-
-```text
-http://localhost:3000/api/poster/inception
-```
-
-Returns:
-
-```json
-{
-  "title": "inception",
-  "posters": [
-    "https://example.com/poster1.jpg",
-    "https://example.com/poster2.jpg"
-  ]
-}
-```
 
 ---
 
@@ -95,9 +26,11 @@ git push
 2. Go to **Vercel Dashboard → New Project → Import GitHub Repository**
 3. Set environment variables in **Vercel Settings → Environment Variables**:
 
-```
+```text
 FIRECRAWL_API_KEY
 ```
+
+Value: your Firecrawl API key.
 
 4. Deploy. Your API will be available at:
 
@@ -181,7 +114,7 @@ GET /api/poster-img/inception.jpg
 * Plex / media server poster automation
 * Streaming dashboards
 * Movie metadata tools
-* m3u4u or other apps needing poster URLs
+* LemonChat or other apps needing poster URLs
 
 ---
 
@@ -195,4 +128,4 @@ GET /api/poster-img/inception.jpg
 
 ## License
 
-MIT License — free to use, modify, and deploy
+MIT License 
