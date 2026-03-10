@@ -114,18 +114,3 @@ GET /api/poster-img/inception.jpg
 * Plex / media server poster automation
 * Streaming dashboards
 * Movie metadata tools
-* LemonChat or other apps needing poster URLs
-
----
-
-## Recommended Enhancements
-
-* TMDB API integration for official, high-quality posters
-* Persistent caching with Vercel KV or a database
-* Auto-update cache on new releases
-
----
-
-## License
-
-MIT License 
