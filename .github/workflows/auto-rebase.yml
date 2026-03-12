@@ -1,6 +1,7 @@
 name: Auto Rebase PRs
 
 on:
+  workflow_dispatch:
   pull_request:
     types: [opened, synchronize, reopened]
   schedule:
@@ -15,12 +16,12 @@ jobs:
       pull-requests: write
 
     steps:
-      - name: Checkout PR branch
+      - name: Checkout repo
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Configure git
+      - name: Configure Git
         run: |
           git config --global user.name "auto-rebase-bot"
           git config --global user.email "actions@github.com"
@@ -28,9 +29,9 @@ jobs:
       - name: Fetch main
         run: git fetch origin main
 
-      - name: Rebase branch onto main
+      - name: Rebase onto main
         run: |
-          git rebase origin/main || echo "Rebase conflict"
+          git rebase -X ours origin/main || echo "Rebase conflict"
 
       - name: Push changes
         run: |
