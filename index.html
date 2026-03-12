@@ -62,156 +62,68 @@
       ul { margin: 12px 0 0; padding-left: 18px; }
       li { margin-bottom: 8px; }
       a { color: #93c5fd; word-break: break-all; }
-      .small { font-size: 0.85rem; color: var(--muted); }
+      .suggestions {
+        margin-top: 8px;
+        list-style: none;
+        padding: 0;
+        border: 1px solid #334155;
+        border-radius: 10px;
+        background: #0b1220;
+        max-height: 220px;
+        overflow-y: auto;
+      }
+      .suggestions[hidden] { display: none; }
+      .suggestions li {
+        margin: 0;
+      }
+      .suggestion-btn {
+        width: 100%;
+        text-align: left;
+        margin: 0;
+        border: 0;
+        border-bottom: 1px solid #1f2937;
+        border-radius: 0;
+        background: transparent;
+        color: var(--text);
+        padding: 10px 12px;
+        font-size: 0.95rem;
+        cursor: pointer;
+      }
+      .suggestion-btn:hover,
+      .suggestion-btn.active {
+        background: #1e293b;
+      }
+      .suggestions li:last-child .suggestion-btn,
+      .suggestions li:last-child .suggestion-text {
+        border-bottom: 0;
+      }
+      .suggestion-text {
+        display: block;
+        border-bottom: 1px solid #1f2937;
+        padding: 10px 12px;
+        font-size: 0.9rem;
+        color: var(--muted);
+      }
     </style>
   </head>
   <body>
     <main class="container">
       <h1>Movie Poster Finder</h1>
-      <p>Find direct JPG/JPEG movie poster URLs using Firecrawl. Works well on iPad in Safari/Chrome.</p>
+      <p>Find direct movie poster URLs using Firecrawl. Works well on iPad in Safari/Chrome.</p>
 
       <div class="grid">
         <div>
-          <label for="apiKey">Firecrawl API Key</label>
-          <input id="apiKey" type="password" placeholder="fc-..." autocomplete="off" />
-        </div>
-
-        <div>
           <label for="title">Movie Title</label>
-          <input id="title" type="text" placeholder="Inception" />
+          <input id="title" type="text" placeholder="Inception" autocomplete="off" />
+          <ul id="suggestions" class="suggestions" hidden></ul>
         </div>
 
         <button id="searchBtn">Find Top 5 Posters</button>
         <div id="status" class="status"></div>
         <ul id="results"></ul>
-
-        <p class="small">Tip: for production, proxy calls through your own backend so your API key is not exposed in the browser.</p>
       </div>
     </main>
 
-    <script>
-      const FIRECRAWL_BASE_URL = "https://api.firecrawl.dev/v1";
-
-      async function firecrawlRequest(path, apiKey, body) {
-        const response = await fetch(`${FIRECRAWL_BASE_URL}${path}`, {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${apiKey}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(body),
-        });
-
-        if (!response.ok) {
-          const text = await response.text();
-          throw new Error(`Firecrawl ${path} failed (${response.status}): ${text}`);
-        }
-
-        return response.json();
-      }
-
-      function extractImageUrls(html, baseUrl) {
-        const regex = /<img\b[^>]*\bsrc=["']([^"']+)["'][^>]*>/gi;
-        const urls = [];
-        let match;
-
-        while ((match = regex.exec(html)) !== null) {
-          const src = match[1]?.trim();
-          if (!src || src.startsWith("data:")) continue;
-          try {
-            urls.push(new URL(src, baseUrl).toString());
-          } catch {
-            // ignore malformed urls
-          }
-        }
-
-        return urls;
-      }
-
-      function isJpgUrl(url) {
-        return /\.jpe?g(?:$|[?#])/i.test(url);
-      }
-
-      function posterScore(url) {
-        const lower = url.toLowerCase();
-        let score = 0;
-        if (/(poster|cover|movie)/.test(lower)) score += 3;
-        if (/(\d{3,4})x(\d{3,4})/.test(lower)) score += 2;
-        if (/vertical|large|original|hires/.test(lower)) score += 1;
-        if (/thumb|small|icon|avatar/.test(lower)) score -= 2;
-        return score;
-      }
-
-      function rankPosterUrls(urls) {
-        return [...new Set(urls)]
-          .map((url) => ({ url, score: posterScore(url) }))
-          .sort((a, b) => b.score - a.score)
-          .map((x) => x.url);
-      }
-
-      async function getMoviePosters(title, apiKey) {
-        if (!title || !title.trim()) throw new Error("A movie title is required.");
-        if (!apiKey || !apiKey.trim()) throw new Error("A Firecrawl API key is required.");
-
-        const query = `${title} movie poster`;
-        const search = await firecrawlRequest("/search", apiKey, { query, limit: 8 });
-        const items = search?.data ?? search?.results ?? [];
-        const pages = [...new Set(items.map((i) => i.url || i.link).filter((u) => typeof u === "string" && u.startsWith("http")))].slice(0, 5);
-
-        const candidates = [];
-        for (const pageUrl of pages) {
-          try {
-            const scraped = await firecrawlRequest("/scrape", apiKey, { url: pageUrl, formats: ["html"] });
-            const html = scraped?.data?.html || scraped?.data?.rawHtml || scraped?.html || scraped?.rawHtml || "";
-            if (!html) continue;
-            const imgs = extractImageUrls(html, pageUrl).filter(isJpgUrl);
-            candidates.push(...imgs);
-          } catch {
-            // continue with other pages
-          }
-        }
-
-        return rankPosterUrls(candidates).slice(0, 5);
-      }
-
-      const searchBtn = document.getElementById("searchBtn");
-      const statusEl = document.getElementById("status");
-      const resultsEl = document.getElementById("results");
-
-      searchBtn.addEventListener("click", async () => {
-        const title = document.getElementById("title").value.trim();
-        const apiKey = document.getElementById("apiKey").value.trim();
-
-        statusEl.className = "status";
-        statusEl.textContent = "Searching and crawling...";
-        resultsEl.innerHTML = "";
-        searchBtn.disabled = true;
-
-        try {
-          const posters = await getMoviePosters(title, apiKey);
-          if (!posters.length) {
-            statusEl.textContent = "No JPG/JPEG poster URLs found.";
-            return;
-          }
-
-          statusEl.textContent = `Found ${posters.length} poster URL(s):`;
-          for (const url of posters) {
-            const li = document.createElement("li");
-            const a = document.createElement("a");
-            a.href = url;
-            a.target = "_blank";
-            a.rel = "noopener noreferrer";
-            a.textContent = url;
-            li.appendChild(a);
-            resultsEl.appendChild(li);
-          }
-        } catch (err) {
-          statusEl.className = "status error";
-          statusEl.textContent = err.message;
-        } finally {
-          searchBtn.disabled = false;
-        }
-      });
-    </script>
+    <script src="./app.js"></script>
   </body>
 </html>
