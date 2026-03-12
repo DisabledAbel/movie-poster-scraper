@@ -1,3 +1,4 @@
+(() => {
 const LOCAL_MOVIE_SUGGESTIONS = [
   "Inception", "Interstellar", "The Dark Knight", "The Matrix", "Avatar", "Titanic",
   "The Godfather", "Pulp Fiction", "Fight Club", "Forrest Gump", "Gladiator", "The Shawshank Redemption",
@@ -19,6 +20,11 @@ const searchBtn = document.getElementById("searchBtn");
 const statusEl = document.getElementById("status");
 const resultsEl = document.getElementById("results");
 const suggestionsEl = document.getElementById("suggestions");
+
+if (!titleInput || !searchBtn || !statusEl || !resultsEl || !suggestionsEl) {
+  console.error("Movie Poster Finder: required DOM elements are missing.");
+  return;
+}
 
 async function getMoviePosters(title) {
   if (!title || !title.trim()) throw new Error("A movie title is required.");
@@ -242,3 +248,5 @@ searchBtn.addEventListener("click", async () => {
     searchBtn.disabled = false;
   }
 });
+
+})();
