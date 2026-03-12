@@ -93,10 +93,17 @@
       .suggestion-btn.active {
         background: #1e293b;
       }
-      .suggestions li:last-child .suggestion-btn {
+      .suggestions li:last-child .suggestion-btn,
+      .suggestions li:last-child .suggestion-text {
         border-bottom: 0;
       }
-      .small { font-size: 0.85rem; color: var(--muted); }
+      .suggestion-text {
+        display: block;
+        border-bottom: 1px solid #1f2937;
+        padding: 10px 12px;
+        font-size: 0.9rem;
+        color: var(--muted);
+      }
     </style>
   </head>
   <body>
@@ -118,7 +125,7 @@
     </main>
 
     <script>
-      const MOVIE_SUGGESTIONS = [
+      const LOCAL_MOVIE_SUGGESTIONS = [
         "Inception", "Interstellar", "The Dark Knight", "The Matrix", "Avatar", "Titanic",
         "The Godfather", "Pulp Fiction", "Fight Club", "Forrest Gump", "Gladiator", "The Shawshank Redemption",
         "Oppenheimer", "Dune", "Dune: Part Two", "Mad Max: Fury Road", "The Batman", "Joker",
@@ -127,6 +134,18 @@
         "Mission: Impossible", "John Wick", "The Lion King", "Frozen", "Coco", "Inside Out",
         "Whiplash", "Parasite", "La La Land", "The Social Network", "Blade Runner 2049", "The Prestige"
       ];
+
+      const MAX_SUGGESTIONS = 8;
+      let selectedSuggestionIndex = -1;
+      let latestQuery = "";
+      let remoteAbortController;
+      let pendingRemoteTimer;
+
+      const titleInput = document.getElementById("title");
+      const searchBtn = document.getElementById("searchBtn");
+      const statusEl = document.getElementById("status");
+      const resultsEl = document.getElementById("results");
+      const suggestionsEl = document.getElementById("suggestions");
 
       async function getMoviePosters(title) {
         if (!title || !title.trim()) throw new Error("A movie title is required.");
@@ -140,20 +159,72 @@
         return Array.isArray(payload?.posters) ? payload.posters : [];
       }
 
-      const titleInput = document.getElementById("title");
-      const searchBtn = document.getElementById("searchBtn");
-      const statusEl = document.getElementById("status");
-      const resultsEl = document.getElementById("results");
-      const suggestionsEl = document.getElementById("suggestions");
-      let selectedSuggestionIndex = -1;
-
-      function getMatchingSuggestions(query) {
+      function rankAndLimitLocalSuggestions(query) {
         const q = query.trim().toLowerCase();
         if (!q) return [];
 
-        const startsWith = MOVIE_SUGGESTIONS.filter((title) => title.toLowerCase().startsWith(q));
-        const contains = MOVIE_SUGGESTIONS.filter((title) => !title.toLowerCase().startsWith(q) && title.toLowerCase().includes(q));
-        return [...startsWith, ...contains].slice(0, 8);
+        const startsWith = LOCAL_MOVIE_SUGGESTIONS.filter((title) => title.toLowerCase().startsWith(q));
+        const contains = LOCAL_MOVIE_SUGGESTIONS.filter((title) => !title.toLowerCase().startsWith(q) && title.toLowerCase().includes(q));
+        return [...startsWith, ...contains].slice(0, MAX_SUGGESTIONS);
+      }
+
+      function normalizeWikiTitle(title) {
+        return title
+          .replace(/\s*\([^)]*film[^)]*\)\s*/gi, "")
+          .replace(/\s*\([^)]*movie[^)]*\)\s*/gi, "")
+          .replace(/\s+/g, " ")
+          .trim();
+      }
+
+      async function fetchRemoteSuggestions(query) {
+        if (!query.trim()) return [];
+
+        if (remoteAbortController) {
+          remoteAbortController.abort();
+        }
+
+        remoteAbortController = new AbortController();
+        const wikiUrl = `https://en.wikipedia.org/w/api.php?action=query&list=search&format=json&origin=*&srlimit=12&srsearch=${encodeURIComponent(`${query} film`)}`;
+
+        try {
+          const response = await fetch(wikiUrl, { signal: remoteAbortController.signal });
+          if (!response.ok) return [];
+
+          const payload = await response.json();
+          const results = payload?.query?.search || [];
+
+          return results
+            .map((item) => normalizeWikiTitle(item?.title || ""))
+            .filter(Boolean)
+            .slice(0, MAX_SUGGESTIONS);
+        } catch (error) {
+          if (error.name === "AbortError") return [];
+          return [];
+        }
+      }
+
+      function mergeSuggestions(localSuggestions, remoteSuggestions, query) {
+        const q = query.trim().toLowerCase();
+        const merged = [];
+        const seen = new Set();
+
+        const all = [...localSuggestions, ...remoteSuggestions];
+        all.forEach((title) => {
+          const cleanTitle = title.trim();
+          const key = cleanTitle.toLowerCase();
+          if (!cleanTitle || seen.has(key)) return;
+          seen.add(key);
+          merged.push(cleanTitle);
+        });
+
+        return merged
+          .sort((a, b) => {
+            const aStarts = a.toLowerCase().startsWith(q) ? 1 : 0;
+            const bStarts = b.toLowerCase().startsWith(q) ? 1 : 0;
+            if (aStarts !== bStarts) return bStarts - aStarts;
+            return a.localeCompare(b);
+          })
+          .slice(0, MAX_SUGGESTIONS);
       }
 
       function hideSuggestions() {
@@ -162,15 +233,14 @@
         selectedSuggestionIndex = -1;
       }
 
-      function renderSuggestions(query) {
-        const matches = getMatchingSuggestions(query);
-        if (!matches.length) {
+      function renderSuggestions(suggestions) {
+        if (!suggestions.length) {
           hideSuggestions();
           return;
         }
 
         suggestionsEl.innerHTML = "";
-        matches.forEach((title, index) => {
+        suggestions.forEach((title, index) => {
           const li = document.createElement("li");
           const btn = document.createElement("button");
           btn.type = "button";
@@ -193,9 +263,50 @@
         suggestionsEl.hidden = false;
       }
 
+      function renderSuggestionText(message) {
+        suggestionsEl.innerHTML = `<li><span class="suggestion-text">${message}</span></li>`;
+        suggestionsEl.hidden = false;
+      }
+
+      async function updateSuggestions(query) {
+        const trimmed = query.trim();
+        latestQuery = trimmed;
+
+        if (!trimmed) {
+          hideSuggestions();
+          return;
+        }
+
+        const localSuggestions = rankAndLimitLocalSuggestions(trimmed);
+        if (localSuggestions.length) {
+          renderSuggestions(localSuggestions);
+        } else {
+          renderSuggestionText("Searching more movie titles...");
+        }
+
+        const remoteSuggestions = await fetchRemoteSuggestions(trimmed);
+
+        if (latestQuery !== trimmed) {
+          return;
+        }
+
+        const mergedSuggestions = mergeSuggestions(localSuggestions, remoteSuggestions, trimmed);
+        if (!mergedSuggestions.length) {
+          renderSuggestionText("No suggestions found. Keep typing...");
+          return;
+        }
+
+        renderSuggestions(mergedSuggestions);
+      }
+
       titleInput.addEventListener("input", () => {
         selectedSuggestionIndex = -1;
-        renderSuggestions(titleInput.value);
+
+        clearTimeout(pendingRemoteTimer);
+        const query = titleInput.value;
+        pendingRemoteTimer = setTimeout(() => {
+          updateSuggestions(query);
+        }, 180);
       });
 
       titleInput.addEventListener("keydown", (event) => {
@@ -205,11 +316,11 @@
         if (event.key === "ArrowDown") {
           event.preventDefault();
           selectedSuggestionIndex = (selectedSuggestionIndex + 1) % buttons.length;
-          renderSuggestions(titleInput.value);
+          renderSuggestions(buttons.map((button) => button.textContent));
         } else if (event.key === "ArrowUp") {
           event.preventDefault();
           selectedSuggestionIndex = (selectedSuggestionIndex - 1 + buttons.length) % buttons.length;
-          renderSuggestions(titleInput.value);
+          renderSuggestions(buttons.map((button) => button.textContent));
         } else if (event.key === "Enter" && selectedSuggestionIndex >= 0) {
           event.preventDefault();
           titleInput.value = buttons[selectedSuggestionIndex].textContent;
