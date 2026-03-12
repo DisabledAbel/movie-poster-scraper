@@ -27,6 +27,10 @@ The webpage no longer accepts a Firecrawl API key input.
 FIRECRAWL_API_KEY=your_key node firecrawl-movie-posters.js "The Matrix"
 ```
 
+## Conflict resolution note
+
+If GitHub still shows PR conflicts, rebase this branch onto the latest target branch and keep these three files from this branch: `README.md`, `index.html`, and `vercel.json`.
+
 ## Vercel setup checklist
 
 If Vercel says production is not serving traffic:
