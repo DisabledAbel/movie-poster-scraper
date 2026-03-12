@@ -1,6 +1,7 @@
 name: Auto Merge
 
 on:
+  workflow_dispatch:
   pull_request:
     types: [labeled]
 
@@ -8,6 +9,10 @@ jobs:
   merge:
     if: contains(github.event.pull_request.labels.*.name, 'automerge')
     runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+      pull-requests: write
 
     steps:
       - name: Merge PR
