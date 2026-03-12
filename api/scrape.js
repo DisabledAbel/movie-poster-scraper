@@ -1,32 +1,110 @@
 import FirecrawlApp from "@mendable/firecrawl-js";
 
+function extractImageUrls(html, baseUrl) {
+  const regex = /<img\b[^>]*\bsrc=["']([^"']+)["'][^>]*>/gi;
+  const urls = [];
+  let match;
+
+  while ((match = regex.exec(html)) !== null) {
+    const src = match[1]?.trim();
+    if (!src || src.startsWith("data:")) continue;
+
+    try {
+      urls.push(new URL(src, baseUrl).toString());
+    } catch {
+      // Ignore malformed URLs.
+    }
+  }
+
+  return urls;
+}
+
+function isImageUrl(url) {
+  return /\.(jpe?g|png|webp)(?:$|[?#])/i.test(url);
+}
+
+function posterScore(url) {
+  const lower = url.toLowerCase();
+  let score = 0;
+
+  if (/(poster|cover|movie)/.test(lower)) score += 3;
+  if (/(\d{3,4})x(\d{3,4})/.test(lower)) score += 2;
+  if (/vertical|large|original|hires/.test(lower)) score += 1;
+  if (/thumb|small|icon|avatar|logo/.test(lower)) score -= 2;
+
+  return score;
+}
+
+function rankPosterUrls(urls) {
+  return [...new Set(urls)]
+    .map((url) => ({ url, score: posterScore(url) }))
+    .sort((a, b) => b.score - a.score)
+    .map((x) => x.url);
+}
+
 export default async function handler(req, res) {
   try {
-    const app = new FirecrawlApp({
-      apiKey: process.env.FIRECRAWL_API_KEY,
+    const apiKey = process.env.FIRECRAWL_API_KEY;
+    if (!apiKey) {
+      return res.status(500).json({ error: "FIRECRAWL_API_KEY is not configured." });
+    }
+
+    const app = new FirecrawlApp({ apiKey });
+    const movie = (req.query.movie || "inception").toString().trim();
+
+    if (!movie) {
+      return res.status(400).json({ error: "Movie title is required." });
+    }
+
+    const searchResult = await app.search(`${movie} movie poster`, {
+      limit: 8,
+      scrapeOptions: { formats: ["links"] },
     });
 
-    const movie = req.query.movie || "inception";
+    const candidates = searchResult?.data ?? [];
 
-    const result = await app.search(`${movie} movie poster`, {
-      limit: 5,
-      scrapeOptions: {
-        formats: ["links"]
+    const directImageUrls = candidates
+      .map((item) => item?.url || item?.link)
+      .filter((url) => typeof url === "string" && isImageUrl(url));
+
+    const pageUrls = candidates
+      .map((item) => item?.url || item?.link)
+      .filter((url) => typeof url === "string" && /^https?:\/\//.test(url))
+      .slice(0, 6);
+
+    const scrapedImageUrls = [];
+
+    for (const pageUrl of pageUrls) {
+      try {
+        const scraped = await app.scrapeUrl(pageUrl, {
+          formats: ["html"],
+        });
+
+        const html =
+          scraped?.html ||
+          scraped?.rawHtml ||
+          scraped?.data?.html ||
+          scraped?.data?.rawHtml ||
+          "";
+
+        if (!html) continue;
+
+        const imageUrls = extractImageUrls(html, pageUrl).filter(isImageUrl);
+        scrapedImageUrls.push(...imageUrls);
+      } catch {
+        // Continue best-effort across URLs.
       }
-    });
+    }
 
-    const posters = result.data
-      .map(x => x.url)
-      .filter(url => url.endsWith(".jpg") || url.endsWith(".png"));
+    const posters = rankPosterUrls([...directImageUrls, ...scrapedImageUrls]).slice(0, 5);
 
-    res.status(200).json({
+    return res.status(200).json({
       movie,
-      posters
+      posters,
     });
-
   } catch (err) {
-    res.status(500).json({
-      error: err.message
+    return res.status(500).json({
+      error: err.message,
     });
   }
 }
