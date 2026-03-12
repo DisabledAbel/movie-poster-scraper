@@ -4,8 +4,6 @@ on:
   workflow_dispatch:
   pull_request:
     types: [opened, synchronize, reopened]
-  schedule:
-    - cron: "0 */6 * * *"
 
 jobs:
   autorebase:
@@ -16,23 +14,40 @@ jobs:
       pull-requests: write
 
     steps:
-      - name: Checkout repo
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Configure Git
+      - name: Setup git
         run: |
-          git config --global user.name "auto-rebase-bot"
+          git config --global user.name "merge-bot"
           git config --global user.email "actions@github.com"
 
-      - name: Fetch main
-        run: git fetch origin main
-
-      - name: Rebase onto main
+      - name: Fetch branches
         run: |
-          git rebase -X ours origin/main || echo "Rebase conflict"
+          git fetch origin main
+          git fetch origin ${{ github.head_ref }}
 
-      - name: Push changes
+      - name: Checkout PR branch
         run: |
-          git push --force-with-lease || echo "Nothing to push"
+          git checkout ${{ github.head_ref }}
+
+      - name: Attempt rebase
+        run: |
+          git rebase origin/main || true
+
+      - name: Auto resolve simple conflicts
+        run: |
+          git diff --name-only --diff-filter=U | while read file; do
+            echo "Resolving $file using PR version"
+            git checkout --ours "$file"
+            git add "$file"
+          done
+
+      - name: Continue rebase
+        run: |
+          git rebase --continue || true
+
+      - name: Push branch
+        run: |
+          git push origin HEAD --force-with-lease
