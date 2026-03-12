@@ -65,18 +65,18 @@
       <h1>Movie Poster Finder</h1>
       <p>Find direct JPG/JPEG movie poster URLs. API key is read from server environment variables only.</p>
 
-      <div class="grid">
+      <form id="searchForm" class="grid">
         <div>
           <label for="title">Movie Title</label>
           <input id="title" type="text" placeholder="Inception" />
         </div>
 
-        <button id="searchBtn">Find Top 5 Posters</button>
+        <button id="searchBtn" type="submit">Find Top 5 Posters</button>
         <div id="status" class="status"></div>
         <ul id="results"></ul>
 
         <p class="small">If requests fail, ensure `FIRECRAWL_API_KEY` is configured in your deployment environment.</p>
-      </div>
+      </form>
     </main>
 
     <script>
@@ -84,7 +84,13 @@
         if (!title || !title.trim()) throw new Error("A movie title is required.");
 
         const response = await fetch(`/api/posters?title=${encodeURIComponent(title)}`);
-        const payload = await response.json();
+
+        let payload = {};
+        try {
+          payload = await response.json();
+        } catch {
+          throw new Error("Unexpected response from server.");
+        }
 
         if (!response.ok) {
           throw new Error(payload.error || "Failed to fetch posters.");
@@ -93,11 +99,13 @@
         return payload.posters || [];
       }
 
+      const searchForm = document.getElementById("searchForm");
       const searchBtn = document.getElementById("searchBtn");
       const statusEl = document.getElementById("status");
       const resultsEl = document.getElementById("results");
 
-      searchBtn.addEventListener("click", async () => {
+      searchForm.addEventListener("submit", async (event) => {
+        event.preventDefault();
         const title = document.getElementById("title").value.trim();
 
         statusEl.className = "status";

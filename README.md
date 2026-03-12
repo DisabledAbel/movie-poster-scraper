@@ -19,7 +19,7 @@ The webpage no longer accepts a Firecrawl API key input.
 
 1. Set `FIRECRAWL_API_KEY` in your deployment environment (e.g. Vercel Project Settings → Environment Variables).
 2. Open the webpage and enter a movie title.
-3. Tap **Find Top 5 Posters**.
+3. Tap **Find Top 5 Posters** (or press Enter).
 
 ## Quick use (Node.js)
 
