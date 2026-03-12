@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Movie Poster Finder (Firecrawl)</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        --text: #e5e7eb;
+        --muted: #94a3b8;
+        --accent: #22c55e;
+        --danger: #ef4444;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        background: linear-gradient(160deg, #0f172a, #1e293b);
+        color: var(--text);
+        min-height: 100vh;
+      }
+      .container {
+        width: min(860px, 94vw);
+        margin: 24px auto;
+        background: rgba(17, 24, 39, 0.9);
+        border: 1px solid rgba(148, 163, 184, 0.25);
+        border-radius: 14px;
+        padding: 20px;
+      }
+      h1 { margin: 0 0 8px; font-size: 1.5rem; }
+      p { color: var(--muted); line-height: 1.4; margin-top: 0; }
+      .grid { display: grid; gap: 12px; }
+      label { font-size: 0.95rem; color: #cbd5e1; }
+      input {
+        width: 100%;
+        border: 1px solid #334155;
+        background: #0b1220;
+        color: var(--text);
+        border-radius: 10px;
+        padding: 12px;
+        font-size: 1rem;
+      }
+      button {
+        margin-top: 8px;
+        border: 0;
+        border-radius: 10px;
+        padding: 12px 16px;
+        background: var(--accent);
+        color: #052e16;
+        font-weight: 700;
+        font-size: 1rem;
+      }
+      button:disabled { opacity: 0.55; }
+      .status { margin-top: 14px; font-size: 0.95rem; }
+      .error { color: var(--danger); }
+      ul { margin: 12px 0 0; padding-left: 18px; }
+      li { margin-bottom: 8px; }
+      a { color: #93c5fd; word-break: break-all; }
+      .small { font-size: 0.85rem; color: var(--muted); }
+    </style>
+  </head>
+  <body>
+    <main class="container">
+      <h1>Movie Poster Finder</h1>
+      <p>Find direct JPG/JPEG movie poster URLs. API key is read from server environment variables only.</p>
+
+      <div class="grid">
+        <div>
+          <label for="title">Movie Title</label>
+          <input id="title" type="text" placeholder="Inception" />
+        </div>
+
+        <button id="searchBtn">Find Top 5 Posters</button>
+        <div id="status" class="status"></div>
+        <ul id="results"></ul>
+
+        <p class="small">If requests fail, ensure `FIRECRAWL_API_KEY` is configured in your deployment environment.</p>
+      </div>
+    </main>
+
+    <script>
+      async function getMoviePosters(title) {
+        if (!title || !title.trim()) throw new Error("A movie title is required.");
+
+        const response = await fetch(`/api/posters?title=${encodeURIComponent(title)}`);
+        const payload = await response.json();
+
+        if (!response.ok) {
+          throw new Error(payload.error || "Failed to fetch posters.");
+        }
+
+        return payload.posters || [];
+      }
+
+      const searchBtn = document.getElementById("searchBtn");
+      const statusEl = document.getElementById("status");
+      const resultsEl = document.getElementById("results");
+
+      searchBtn.addEventListener("click", async () => {
+        const title = document.getElementById("title").value.trim();
+
+        statusEl.className = "status";
+        statusEl.textContent = "Searching and crawling...";
+        resultsEl.innerHTML = "";
+        searchBtn.disabled = true;
+
+        try {
+          const posters = await getMoviePosters(title);
+          if (!posters.length) {
+            statusEl.textContent = "No JPG/JPEG poster URLs found.";
+            return;
+          }
+
+          statusEl.textContent = `Found ${posters.length} poster URL(s):`;
+          for (const url of posters) {
+            const li = document.createElement("li");
+            const a = document.createElement("a");
+            a.href = url;
+            a.target = "_blank";
+            a.rel = "noopener noreferrer";
+            a.textContent = url;
+            li.appendChild(a);
+            resultsEl.appendChild(li);
+          }
+        } catch (err) {
+          statusEl.className = "status error";
+          statusEl.textContent = err.message;
+        } finally {
+          searchBtn.disabled = false;
+        }
+      });
+    </script>
+  </body>
+</html>
