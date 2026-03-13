@@ -5,18 +5,31 @@ import FirecrawlApp from "@mendable/firecrawl-js";
 const CACHE_DIR = path.resolve(".cache");
 if (!fs.existsSync(CACHE_DIR)) fs.mkdirSync(CACHE_DIR);
 
-function isPosterImageUrl(url) {
-  return /\.(?:jpe?g|png|webp)(?:$|[?#])/i.test(url);
+function hasImageExtension(url) {
+  return /\.(?:jpe?g|png|webp|gif|avif)(?:$|[?#])/i.test(url);
+}
+
+function isLikelyPosterImageUrl(url) {
+  const lower = url.toLowerCase();
+
+  if (hasImageExtension(lower)) return true;
+  if (/\.(?:html?|php|aspx?|jsp)(?:$|[?#])/.test(lower)) return false;
+
+  const hasImageQueryHint = /[?&](?:format|fm|ext|type|image_format)=(?:jpe?g|png|webp|avif)/.test(lower);
+  const hasPosterHint = /(poster|cover|movie|theatrical|backdrop|artwork|tmdb|image|img)/.test(lower);
+  return hasImageQueryHint || hasPosterHint;
 }
 
 function posterScore(url) {
   const lower = url.toLowerCase();
   let score = 0;
 
-  if (/(poster|cover|movie|theatrical)/.test(lower)) score += 3;
+  if (/(poster|cover|movie|theatrical|artwork)/.test(lower)) score += 3;
+  if (/tmdb|fanart|imdb/.test(lower)) score += 2;
+  if (/image|img|cdn/.test(lower)) score += 1;
   if (/(\d{3,4})x(\d{3,4})/.test(lower)) score += 2;
   if (/(vertical|large|original|hires|full)/.test(lower)) score += 1;
-  if (/(thumb|small|icon|avatar|logo)/.test(lower)) score -= 2;
+  if (/(thumb|small|icon|avatar|logo|sprite)/.test(lower)) score -= 2;
 
   return score;
 }
@@ -39,6 +52,20 @@ function extractImageCandidates(result) {
   return urls;
 }
 
+function pickTopPosterUrls(candidates, limit = 5) {
+  const ranked = [...new Set(candidates)]
+    .filter((url) => typeof url === "string" && url.startsWith("http"))
+    .sort((a, b) => posterScore(b) - posterScore(a));
+
+  const strictMatches = ranked.filter((url) => hasImageExtension(url));
+  if (strictMatches.length >= limit) {
+    return strictMatches.slice(0, limit);
+  }
+
+  const relaxedMatches = ranked.filter((url) => isLikelyPosterImageUrl(url));
+  return relaxedMatches.slice(0, limit);
+}
+
 export default async function handler(req, res) {
   try {
     const title = req.query.title;
@@ -54,14 +81,11 @@ export default async function handler(req, res) {
     const app = new FirecrawlApp({ apiKey: process.env.FIRECRAWL_API_KEY });
 
     const result = await app.search(`${title} movie poster`, {
-      limit: 8,
+      limit: 10,
       scrapeOptions: { formats: ["links"] },
     });
 
-    const posters = [...new Set(extractImageCandidates(result))]
-      .filter((url) => isPosterImageUrl(url))
-      .sort((a, b) => posterScore(b) - posterScore(a))
-      .slice(0, 5);
+    const posters = pickTopPosterUrls(extractImageCandidates(result), 5);
 
     fs.writeFileSync(safeFile, JSON.stringify({ title, posters }));
 

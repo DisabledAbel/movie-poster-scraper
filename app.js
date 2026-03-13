@@ -179,6 +179,16 @@
           img.className = "poster-preview";
           img.loading = "lazy";
 
+          const previewHint = document.createElement("div");
+          previewHint.className = "preview-hint";
+          previewHint.textContent = "Preview unavailable for this source";
+          previewHint.hidden = true;
+
+          img.addEventListener("error", () => {
+            img.hidden = true;
+            previewHint.hidden = false;
+          });
+
           const link = document.createElement("a");
           link.href = url;
           link.target = "_blank";
@@ -192,6 +202,7 @@
           copyBtn.addEventListener("click", () => copyPosterLink(url, copyBtn));
 
           li.appendChild(img);
+          li.appendChild(previewHint);
           li.appendChild(link);
           li.appendChild(copyBtn);
           resultsEl.appendChild(li);
