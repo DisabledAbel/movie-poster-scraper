@@ -141,6 +141,63 @@
         suggestionsEl.hidden = false;
       }
 
+      async function copyPosterLink(url, button) {
+        const originalText = button.textContent;
+
+        try {
+          if (navigator.clipboard?.writeText) {
+            await navigator.clipboard.writeText(url);
+          } else {
+            const tempInput = document.createElement("input");
+            tempInput.value = url;
+            document.body.appendChild(tempInput);
+            tempInput.select();
+            document.execCommand("copy");
+            tempInput.remove();
+          }
+
+          button.textContent = "Copied!";
+        } catch {
+          button.textContent = "Copy failed";
+        }
+
+        setTimeout(() => {
+          button.textContent = originalText;
+        }, 1400);
+      }
+
+      function renderPosterResults(posters) {
+        resultsEl.innerHTML = "";
+
+        posters.forEach((url) => {
+          const li = document.createElement("li");
+          li.className = "result-item";
+
+          const img = document.createElement("img");
+          img.src = url;
+          img.alt = "Poster preview";
+          img.className = "poster-preview";
+          img.loading = "lazy";
+
+          const link = document.createElement("a");
+          link.href = url;
+          link.target = "_blank";
+          link.rel = "noopener noreferrer";
+          link.textContent = url;
+
+          const copyBtn = document.createElement("button");
+          copyBtn.type = "button";
+          copyBtn.className = "copy-btn";
+          copyBtn.textContent = "Copy link";
+          copyBtn.addEventListener("click", () => copyPosterLink(url, copyBtn));
+
+          li.appendChild(img);
+          li.appendChild(link);
+          li.appendChild(copyBtn);
+          resultsEl.appendChild(li);
+        });
+      }
+
       async function updateSuggestions(query) {
         const trimmed = query.trim();
         latestQuery = trimmed;
@@ -220,21 +277,12 @@
         try {
           const posters = await getMoviePosters(title);
           if (!posters.length) {
-            statusEl.textContent = "No JPG/JPEG poster URLs found.";
+            statusEl.textContent = "No poster image URLs found.";
             return;
           }
 
           statusEl.textContent = `Found ${posters.length} poster URL(s):`;
-          for (const url of posters) {
-            const li = document.createElement("li");
-            const a = document.createElement("a");
-            a.href = url;
-            a.target = "_blank";
-            a.rel = "noopener noreferrer";
-            a.textContent = url;
-            li.appendChild(a);
-            resultsEl.appendChild(li);
-          }
+          renderPosterResults(posters);
         } catch (err) {
           statusEl.className = "status error";
           statusEl.textContent = err.message;

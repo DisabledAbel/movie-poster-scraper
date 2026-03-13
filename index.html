@@ -62,6 +62,30 @@
       ul { margin: 12px 0 0; padding-left: 18px; }
       li { margin-bottom: 8px; }
       a { color: #93c5fd; word-break: break-all; }
+      #results {
+        list-style: none;
+        padding-left: 0;
+      }
+      .result-item {
+        margin-bottom: 14px;
+        padding: 12px;
+        border: 1px solid #334155;
+        border-radius: 10px;
+        background: #0b1220;
+      }
+      .poster-preview {
+        display: block;
+        width: 100%;
+        max-width: 220px;
+        border-radius: 8px;
+        border: 1px solid #1f2937;
+        margin-bottom: 8px;
+      }
+      .copy-btn {
+        margin-top: 8px;
+        background: #334155;
+        color: #e2e8f0;
+      }
       .suggestions {
         margin-top: 8px;
         list-style: none;
@@ -123,4 +147,6 @@
         <ul id="results"></ul>
       </div>
     </main>
-    
+    <script src="/app.js"></script>
+  </body>
+</html>
