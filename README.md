@@ -20,7 +20,7 @@ This project provides a **movie poster API** using **Firecrawl** to fetch poster
 
 - Node.js 18+
 - npm 9+
-- A Firecrawl API key
+- A Firecrawl API key (**Fallback IMDb endpoint if there is no API key in ENVs.**
 
 ### 1) Install dependencies
 
@@ -87,6 +87,7 @@ FIRECRAWL_API_KEY
 ```
 
 Value: your Firecrawl API key.
+**Fallback IMDb endpoint if there is no API key in ENVs.**
 
 4. Deploy. Your API will be available at:
 
