@@ -1,15 +1,12 @@
-name: Auto Rebase PRs
+name: Auto Resolve PR Conflicts
 
 on:
   workflow_dispatch:
   pull_request:
     types: [opened, synchronize, reopened]
 
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-
 jobs:
-  autorebase:
+  resolve:
     runs-on: ubuntu-latest
 
     permissions:
@@ -22,12 +19,12 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Setup git
+      - name: Configure Git
         run: |
-          git config --global user.name "merge-bot"
+          git config --global user.name "conflict-bot"
           git config --global user.email "actions@github.com"
 
-      - name: Fetch branches
+      - name: Fetch all branches
         run: |
           git fetch origin main
           git fetch origin ${{ github.head_ref }}
@@ -36,22 +33,20 @@ jobs:
         run: |
           git checkout ${{ github.head_ref }}
 
-      - name: Attempt rebase
+      - name: Merge main
         run: |
-          git rebase origin/main || true
+          git merge origin/main || true
 
-      - name: Auto resolve simple conflicts
+      - name: Force resolve known conflicts
         run: |
-          git diff --name-only --diff-filter=U | while read file; do
-            echo "Resolving $file using PR version"
-            git checkout --ours "$file"
-            git add "$file"
-          done
+          git checkout --ours app.js || true
+          git checkout --ours index.html || true
+          git add app.js index.html || true
 
-      - name: Continue rebase
+      - name: Commit resolution
         run: |
-          git rebase --continue || true
+          git commit -m "Auto resolve conflicts in app.js and index.html" || true
 
-      - name: Push branch
+      - name: Push changes
         run: |
           git push origin HEAD --force-with-lease
