@@ -53,6 +53,31 @@ function isPosterImageUrl(url) {
   return looksLikeCleanImageUrl(url);
 }
 
+function canonicalPosterKey(url) {
+  try {
+    const parsed = new URL(url);
+    const hostname = parsed.hostname.toLowerCase();
+    const pathname = decodePossibleUrl(parsed.pathname).replace(/\/+/g, "/").toLowerCase();
+    return `${hostname}${pathname}`;
+  } catch {
+    return normalizeImageUrl(url).toLowerCase();
+  }
+}
+
+function dedupePosterUrls(urls) {
+  const deduped = [];
+  const seenKeys = new Set();
+
+  for (const url of urls) {
+    const key = canonicalPosterKey(url);
+    if (seenKeys.has(key)) continue;
+    seenKeys.add(key);
+    deduped.push(url);
+  }
+
+  return deduped;
+}
+
 function posterScore(url) {
   const lower = url.toLowerCase();
   let score = 0;
@@ -120,7 +145,7 @@ export default async function handler(req, res) {
       },
     });
 
-    const posters = [...new Set(extractImageCandidates(result))]
+    const posters = dedupePosterUrls(extractImageCandidates(result))
       .filter((url) => isPosterImageUrl(url))
       .sort((a, b) => posterScore(b) - posterScore(a))
       .slice(0, 5);
