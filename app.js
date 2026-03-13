@@ -30,12 +30,13 @@
     if (!title || !title.trim()) throw new Error("A movie title is required.");
 
     const response = await fetch(`/api/scrape?movie=${encodeURIComponent(title)}`);
+    const responseClone = response.clone();
     let payload = {};
 
     try {
       payload = await response.json();
     } catch {
-      const fallback = await response.text().catch(() => "");
+      const fallback = await responseClone.text().catch(() => "");
       throw new Error(fallback || "Server returned an invalid response.");
     }
 
