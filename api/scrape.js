@@ -1,6 +1,6 @@
 import FirecrawlApp from "@mendable/firecrawl-js";
 
-const IMAGE_URL_PATTERN = /https?:\/\/[^\s"'`<>\])]+?\.(?:jpe?g)(?:\?[^\s"'`<>\])]+)?/gi;
+const IMAGE_URL_PATTERN = /https?:\/\/[^\s"'`<>()\[\]{}]+?\.(?:jpe?g)(?:\?[^\s"'`<>()\[\]{}]+)?/gi;
 
 function normalizeImageUrl(value) {
   if (typeof value !== "string") return "";
@@ -10,14 +10,47 @@ function normalizeImageUrl(value) {
     .replace(/[\u201d\u2019]+$/g, "");
 }
 
+function decodePossibleUrl(url) {
+  try {
+    return decodeURIComponent(url);
+  } catch {
+    return url;
+  }
+}
+
+function looksLikeCleanImageUrl(url) {
+  if (typeof url !== "string") return false;
+
+  const trimmed = url.trim();
+  if (!/^https?:\/\//i.test(trimmed)) return false;
+  if (/[\s<>{}[\]`]/.test(trimmed)) return false;
+
+  const decoded = decodePossibleUrl(trimmed).toLowerCase();
+  if (decoded.includes("[homepage]") || decoded.includes("add to favorites")) return false;
+  if (/\.(?:jpe?g)(?:$|[?#])/i.test(trimmed) === false) return false;
+
+  try {
+    const parsed = new URL(trimmed);
+    const pathAndQuery = `${parsed.pathname}${parsed.search}`;
+    if (/\[(?:[^\]]*)\]|\((?:[^)]*)\)/.test(pathAndQuery)) return false;
+    if (/%5b|%5d/i.test(pathAndQuery)) return false;
+    if (pathAndQuery.length > 260) return false;
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 function extractImageUrlsFromText(text) {
   if (typeof text !== "string") return [];
   const matches = text.match(IMAGE_URL_PATTERN) || [];
-  return matches.map((url) => normalizeImageUrl(url)).filter(Boolean);
+  return matches
+    .map((url) => normalizeImageUrl(url))
+    .filter((url) => looksLikeCleanImageUrl(url));
 }
 
 function isPosterImageUrl(url) {
-  return /\.(?:jpe?g)(?:$|[?#])/i.test(url);
+  return looksLikeCleanImageUrl(url);
 }
 
 function posterScore(url) {
