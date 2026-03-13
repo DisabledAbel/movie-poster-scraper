@@ -130,29 +130,64 @@ function extractImageCandidates(result) {
   return urls;
 }
 
+async function fetchImdbPosterCandidates(movie) {
+  const trimmedMovie = typeof movie === "string" ? movie.trim() : "";
+  if (!trimmedMovie) return [];
+
+  const firstChar = trimmedMovie[0].toLowerCase();
+  const imdbUrl = `https://v3.sg.media-imdb.com/suggestion/${encodeURIComponent(firstChar)}/${encodeURIComponent(trimmedMovie)}.json`;
+
+  const response = await fetch(imdbUrl);
+  if (!response.ok) return [];
+
+  const payload = await response.json();
+  const candidates = (payload?.d || [])
+    .filter((item) => item?.id?.startsWith("tt"))
+    .map((item) => item?.i?.imageUrl)
+    .filter((url) => typeof url === "string");
+
+  return dedupePosterUrls(candidates)
+    .filter((url) => isPosterImageUrl(url))
+    .sort((a, b) => posterScore(b) - posterScore(a));
+}
+
 export default async function handler(req, res) {
   try {
-    const app = new FirecrawlApp({
-      apiKey: process.env.FIRECRAWL_API_KEY,
-    });
-
     const movie = req.query.movie || "inception";
+    let posters = [];
+    let source = "imdb";
 
-    const result = await app.search(`${movie} movie poster`, {
-      limit: 8,
-      scrapeOptions: {
-        formats: ["links", "markdown"],
-      },
-    });
+    try {
+      const app = new FirecrawlApp({
+        apiKey: process.env.FIRECRAWL_API_KEY,
+      });
 
-    const posters = dedupePosterUrls(extractImageCandidates(result))
-      .filter((url) => isPosterImageUrl(url))
-      .sort((a, b) => posterScore(b) - posterScore(a))
-      .slice(0, 5);
+      const result = await app.search(`${movie} movie poster`, {
+        limit: 8,
+        scrapeOptions: {
+          formats: ["links", "markdown"],
+        },
+      });
+
+      posters = dedupePosterUrls(extractImageCandidates(result))
+        .filter((url) => isPosterImageUrl(url))
+        .sort((a, b) => posterScore(b) - posterScore(a))
+        .slice(0, 5);
+
+      source = "firecrawl";
+    } catch {
+      posters = [];
+    }
+
+    if (!posters.length) {
+      posters = (await fetchImdbPosterCandidates(movie)).slice(0, 5);
+      source = "imdb";
+    }
 
     res.status(200).json({
       movie,
       posters,
+      source,
     });
   } catch (err) {
     res.status(500).json({

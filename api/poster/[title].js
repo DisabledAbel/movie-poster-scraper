@@ -39,6 +39,27 @@ function extractImageCandidates(result) {
   return urls;
 }
 
+async function fetchImdbPosterCandidates(title) {
+  const trimmedTitle = typeof title === "string" ? title.trim() : "";
+  if (!trimmedTitle) return [];
+
+  const firstChar = trimmedTitle[0].toLowerCase();
+  const imdbUrl = `https://v3.sg.media-imdb.com/suggestion/${encodeURIComponent(firstChar)}/${encodeURIComponent(trimmedTitle)}.json`;
+
+  const response = await fetch(imdbUrl);
+  if (!response.ok) return [];
+
+  const payload = await response.json();
+  const candidates = (payload?.d || [])
+    .filter((item) => item?.id?.startsWith("tt"))
+    .map((item) => item?.i?.imageUrl)
+    .filter((url) => typeof url === "string");
+
+  return [...new Set(candidates)]
+    .filter((url) => isPosterImageUrl(url))
+    .sort((a, b) => posterScore(b) - posterScore(a));
+}
+
 export default async function handler(req, res) {
   try {
     const title = req.query.title;
@@ -51,17 +72,27 @@ export default async function handler(req, res) {
       return res.status(200).json(data);
     }
 
-    const app = new FirecrawlApp({ apiKey: process.env.FIRECRAWL_API_KEY });
+    let posters = [];
 
-    const result = await app.search(`${title} movie poster`, {
-      limit: 8,
-      scrapeOptions: { formats: ["links"] },
-    });
+    try {
+      const app = new FirecrawlApp({ apiKey: process.env.FIRECRAWL_API_KEY });
 
-    const posters = [...new Set(extractImageCandidates(result))]
-      .filter((url) => isPosterImageUrl(url))
-      .sort((a, b) => posterScore(b) - posterScore(a))
-      .slice(0, 5);
+      const result = await app.search(`${title} movie poster`, {
+        limit: 8,
+        scrapeOptions: { formats: ["links"] },
+      });
+
+      posters = [...new Set(extractImageCandidates(result))]
+        .filter((url) => isPosterImageUrl(url))
+        .sort((a, b) => posterScore(b) - posterScore(a))
+        .slice(0, 5);
+    } catch {
+      posters = [];
+    }
+
+    if (!posters.length) {
+      posters = (await fetchImdbPosterCandidates(title)).slice(0, 5);
+    }
 
     fs.writeFileSync(safeFile, JSON.stringify({ title, posters }));
 
