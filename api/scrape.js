@@ -1,15 +1,9 @@
-import FirecrawlApp from "@mendable/firecrawl-js";
-import { searchPosterCandidates } from "./poster/utils.js";
+import { fetchPostersForTitle } from "./poster/utils.js";
 
 export default async function handler(req, res) {
   try {
-    const app = new FirecrawlApp({
-      apiKey: process.env.FIRECRAWL_API_KEY,
-    });
-
     const movie = req.query.movie || "inception";
-
-    const posters = await searchPosterCandidates(app, movie);
+    const posters = await fetchPostersForTitle(movie);
 
     res.status(200).json({
       movie,

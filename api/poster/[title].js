@@ -1,7 +1,6 @@
 import fs from "fs";
 import path from "path";
-import FirecrawlApp from "@mendable/firecrawl-js";
-import { searchPosterCandidates } from "./utils.js";
+import { fetchPostersForTitle } from "./utils.js";
 
 const CACHE_DIR = path.resolve(".cache");
 if (!fs.existsSync(CACHE_DIR)) fs.mkdirSync(CACHE_DIR);
@@ -18,9 +17,7 @@ export default async function handler(req, res) {
       return res.status(200).json(data);
     }
 
-    const app = new FirecrawlApp({ apiKey: process.env.FIRECRAWL_API_KEY });
-
-    const posters = await searchPosterCandidates(app, title);
+    const posters = await fetchPostersForTitle(title);
 
     fs.writeFileSync(safeFile, JSON.stringify({ title, posters }));
 

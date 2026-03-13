@@ -1,3 +1,5 @@
+import FirecrawlApp from "@mendable/firecrawl-js";
+
 export const POSTER_SEARCH_LIMIT = 10;
 
 export function hasImageExtension(url) {
@@ -61,7 +63,6 @@ export function pickTopPosterUrls(candidates, limit = 5) {
   return relaxedMatches.slice(0, limit);
 }
 
-
 export async function searchPosterCandidates(app, title) {
   const result = await app.search(`${title} movie poster`, {
     limit: POSTER_SEARCH_LIMIT,
@@ -69,4 +70,9 @@ export async function searchPosterCandidates(app, title) {
   });
 
   return pickTopPosterUrls(extractImageCandidates(result), 5);
+}
+
+export async function fetchPostersForTitle(title, apiKey = process.env.FIRECRAWL_API_KEY) {
+  const app = new FirecrawlApp({ apiKey });
+  return searchPosterCandidates(app, title);
 }
