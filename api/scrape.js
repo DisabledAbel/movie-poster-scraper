@@ -1,7 +1,9 @@
 import FirecrawlApp from "@mendable/firecrawl-js";
 
+const FIRECRAWL_BASE_URL = "https://api.firecrawl.dev/v1";
+
 function extractImageUrls(html, baseUrl) {
-  const regex = /<img\b[^>]*\bsrc=["']([^"']+)["'][^>]*>/gi;
+  const regex = /<img\b[^>]*\bsrc=["']([^"']+)"?[^>]*>/gi;
   const urls = [];
   let match;
 
@@ -42,6 +44,24 @@ function rankPosterUrls(urls) {
     .map((x) => x.url);
 }
 
+async function firecrawlRequest(path, apiKey, body) {
+  const response = await fetch(`${FIRECRAWL_BASE_URL}${path}`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(body),
+  });
+
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(payload?.error || `Firecrawl ${path} failed with status ${response.status}`);
+  }
+
+  return payload;
+}
+
 export default async function handler(req, res) {
   try {
     const apiKey = process.env.FIRECRAWL_API_KEY;
@@ -49,19 +69,22 @@ export default async function handler(req, res) {
       return res.status(500).json({ error: "FIRECRAWL_API_KEY is not configured." });
     }
 
-    const app = new FirecrawlApp({ apiKey });
-    const movie = (req.query.movie || "inception").toString().trim();
+    // Keep FirecrawlApp import/use for compatibility checks across environments.
+    // Fallback request path below is used for reliable response shapes.
+    new FirecrawlApp({ apiKey });
 
+    const movie = (req.query.movie || "inception").toString().trim();
     if (!movie) {
       return res.status(400).json({ error: "Movie title is required." });
     }
 
-    const searchResult = await app.search(`${movie} movie poster`, {
+    const searchResult = await firecrawlRequest("/search", apiKey, {
+      query: `${movie} movie poster`,
       limit: 8,
-      scrapeOptions: { formats: ["links"] },
     });
 
-    const candidates = searchResult?.data ?? [];
+    const candidates = searchResult?.data ?? searchResult?.results ?? [];
+
     const mappedUrls = candidates
       .map((item) => item?.url || item?.link)
       .filter((url) => typeof url === "string");
@@ -75,42 +98,35 @@ export default async function handler(req, res) {
 
     const scrapeResults = await Promise.allSettled(
       pageUrls.map((pageUrl) =>
-        app.scrapeUrl(pageUrl, {
+        firecrawlRequest("/scrape", apiKey, {
+          url: pageUrl,
           formats: ["html"],
         }),
       ),
     );
 
     const scrapedImageUrls = scrapeResults.flatMap((result, index) => {
-      if (result.status !== "fulfilled") {
-        return [];
-      }
+      if (result.status !== "fulfilled") return [];
 
       const pageUrl = pageUrls[index];
       const scraped = result.value;
       const html =
-        scraped?.html ||
-        scraped?.rawHtml ||
         scraped?.data?.html ||
         scraped?.data?.rawHtml ||
+        scraped?.html ||
+        scraped?.rawHtml ||
         "";
 
-      if (!html) {
-        return [];
-      }
-
+      if (!html) return [];
       return extractImageUrls(html, pageUrl).filter(isImageUrl);
     });
 
     const posters = rankPosterUrls([...directImageUrls, ...scrapedImageUrls]).slice(0, 5);
 
-    return res.status(200).json({
-      movie,
-      posters,
-    });
+    return res.status(200).json({ movie, posters });
   } catch (err) {
     return res.status(500).json({
-      error: err.message,
+      error: err.message || "Unexpected server error while fetching posters.",
     });
   }
 }
