@@ -1,7 +1,23 @@
 import FirecrawlApp from "@mendable/firecrawl-js";
 
+const IMAGE_URL_PATTERN = /https?:\/\/[^\s"'`<>\])]+?\.(?:jpe?g)(?:\?[^\s"'`<>\])]+)?/gi;
+
+function normalizeImageUrl(value) {
+  if (typeof value !== "string") return "";
+  return value
+    .trim()
+    .replace(/[),.;:!?]+$/g, "")
+    .replace(/[\u201d\u2019]+$/g, "");
+}
+
+function extractImageUrlsFromText(text) {
+  if (typeof text !== "string") return [];
+  const matches = text.match(IMAGE_URL_PATTERN) || [];
+  return matches.map((url) => normalizeImageUrl(url)).filter(Boolean);
+}
+
 function isPosterImageUrl(url) {
-  return /\.(?:jpe?g|png|webp)(?:$|[?#])/i.test(url);
+  return /\.(?:jpe?g)(?:$|[?#])/i.test(url);
 }
 
 function posterScore(url) {
@@ -9,28 +25,50 @@ function posterScore(url) {
   let score = 0;
 
   if (/(poster|cover|movie|theatrical)/.test(lower)) score += 3;
+  if (/(imdb|tmdb|wikipedia|fanart|movieposterdb|theposterdb)/.test(lower)) score += 2;
   if (/(\d{3,4})x(\d{3,4})/.test(lower)) score += 2;
   if (/(vertical|large|original|hires|full)/.test(lower)) score += 1;
-  if (/(thumb|small|icon|avatar|logo)/.test(lower)) score -= 2;
+  if (/(thumb|small|icon|avatar|logo|sprite|banner)/.test(lower)) score -= 2;
 
   return score;
 }
 
 function extractImageCandidates(result) {
   const urls = [];
-  const items = Array.isArray(result?.data) ? result.data : [];
+  const seenObjects = new WeakSet();
 
-  for (const item of items) {
-    if (typeof item?.url === "string") urls.push(item.url);
+  function visit(value) {
+    if (!value) return;
 
-    const links = Array.isArray(item?.links) ? item.links : [];
-    for (const link of links) {
-      if (typeof link === "string") urls.push(link);
-      else if (typeof link?.url === "string") urls.push(link.url);
-      else if (typeof link?.href === "string") urls.push(link.href);
+    if (typeof value === "string") {
+      urls.push(...extractImageUrlsFromText(value));
+      if (isPosterImageUrl(value)) {
+        urls.push(normalizeImageUrl(value));
+      }
+      return;
+    }
+
+    if (Array.isArray(value)) {
+      value.forEach(visit);
+      return;
+    }
+
+    if (typeof value === "object") {
+      if (seenObjects.has(value)) return;
+      seenObjects.add(value);
+
+      const directUrlFields = ["url", "href", "src", "image", "imageUrl"];
+      for (const field of directUrlFields) {
+        if (typeof value[field] === "string") {
+          visit(value[field]);
+        }
+      }
+
+      Object.values(value).forEach(visit);
     }
   }
 
+  visit(result?.data ?? result);
   return urls;
 }
 
@@ -45,7 +83,7 @@ export default async function handler(req, res) {
     const result = await app.search(`${movie} movie poster`, {
       limit: 8,
       scrapeOptions: {
-        formats: ["links"],
+        formats: ["links", "markdown"],
       },
     });
 
