@@ -1,9 +1,7 @@
-name: Auto Resolve PR Conflicts
+name: Resolve PR Conflicts
 
 on:
   workflow_dispatch:
-  pull_request:
-    types: [opened, synchronize, reopened]
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
@@ -17,39 +15,38 @@ jobs:
       pull-requests: write
 
     steps:
-      - name: Checkout repo
+      - name: Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Configure Git
+      - name: Configure git
         run: |
-          git config --global user.name "conflict-bot"
-          git config --global user.email "actions@github.com"
+          git config user.name "conflict-bot"
+          git config user.email "actions@github.com"
 
       - name: Fetch branches
         run: |
           git fetch origin main
-          git fetch origin ${{ github.head_ref }}
+          git fetch origin pull/6/head:pr6
 
       - name: Checkout PR branch
-        run: |
-          git checkout ${{ github.head_ref }}
+        run: git checkout pr6
 
       - name: Merge main
         run: |
           git merge origin/main || true
 
-      - name: Force resolve conflicts
+      - name: Resolve known conflicts
         run: |
           git checkout --ours app.js || true
           git checkout --ours index.html || true
           git add app.js index.html || true
 
-      - name: Commit resolution
+      - name: Commit if needed
         run: |
-          git commit -m "Auto resolve conflicts" || true
+          git commit -m "Auto resolve conflicts" || echo "Nothing to commit"
 
-      - name: Push changes
+      - name: Push fix
         run: |
-          git push origin HEAD --force-with-lease
+          git push origin pr6 --force-with-lease
