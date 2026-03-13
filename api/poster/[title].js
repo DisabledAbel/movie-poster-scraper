@@ -39,41 +39,21 @@ function extractImageCandidates(result) {
   return urls;
 }
 
-async function fetchWikipediaPosterCandidates(title) {
-  const query = encodeURIComponent(`${title} film`);
-  const searchUrl = `https://en.wikipedia.org/w/api.php?action=query&list=search&format=json&origin=*&srlimit=6&srsearch=${query}`;
+async function fetchImdbPosterCandidates(title) {
+  const trimmedTitle = typeof title === "string" ? title.trim() : "";
+  if (!trimmedTitle) return [];
 
-  const searchResponse = await fetch(searchUrl);
-  if (!searchResponse.ok) return [];
+  const firstChar = trimmedTitle[0].toLowerCase();
+  const imdbUrl = `https://v3.sg.media-imdb.com/suggestion/${encodeURIComponent(firstChar)}/${encodeURIComponent(trimmedTitle)}.json`;
 
-  const searchPayload = await searchResponse.json();
-  const pageIds = (searchPayload?.query?.search || [])
-    .map((item) => item?.pageid)
-    .filter((id) => Number.isInteger(id));
+  const response = await fetch(imdbUrl);
+  if (!response.ok) return [];
 
-  if (!pageIds.length) return [];
-
-  const detailsUrl = `https://en.wikipedia.org/w/api.php?action=query&format=json&origin=*&prop=pageimages|images&piprop=original&pithumbsize=1000&imlimit=50&pageids=${pageIds.join("|")}`;
-  const detailsResponse = await fetch(detailsUrl);
-  if (!detailsResponse.ok) return [];
-
-  const detailsPayload = await detailsResponse.json();
-  const pages = detailsPayload?.query?.pages || {};
-  const candidates = [];
-
-  for (const page of Object.values(pages)) {
-    const originalSource = page?.original?.source;
-    if (typeof originalSource === "string") candidates.push(originalSource);
-
-    const images = Array.isArray(page?.images) ? page.images : [];
-    for (const image of images) {
-      if (typeof image?.title !== "string") continue;
-      if (!/\.(?:jpe?g)$/i.test(image.title)) continue;
-
-      const fileTitle = image.title.replace(/^File:/i, "");
-      candidates.push(`https://commons.wikimedia.org/wiki/Special:FilePath/${encodeURIComponent(fileTitle)}`);
-    }
-  }
+  const payload = await response.json();
+  const candidates = (payload?.d || [])
+    .filter((item) => item?.id?.startsWith("tt"))
+    .map((item) => item?.i?.imageUrl)
+    .filter((url) => typeof url === "string");
 
   return [...new Set(candidates)]
     .filter((url) => isPosterImageUrl(url))
@@ -111,7 +91,7 @@ export default async function handler(req, res) {
     }
 
     if (!posters.length) {
-      posters = (await fetchWikipediaPosterCandidates(title)).slice(0, 5);
+      posters = (await fetchImdbPosterCandidates(title)).slice(0, 5);
     }
 
     fs.writeFileSync(safeFile, JSON.stringify({ title, posters }));
