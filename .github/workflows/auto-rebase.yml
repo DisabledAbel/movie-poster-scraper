@@ -5,6 +5,9 @@ on:
   pull_request:
     types: [opened, synchronize, reopened]
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   resolve:
     runs-on: ubuntu-latest
@@ -24,7 +27,7 @@ jobs:
           git config --global user.name "conflict-bot"
           git config --global user.email "actions@github.com"
 
-      - name: Fetch all branches
+      - name: Fetch branches
         run: |
           git fetch origin main
           git fetch origin ${{ github.head_ref }}
@@ -37,7 +40,7 @@ jobs:
         run: |
           git merge origin/main || true
 
-      - name: Force resolve known conflicts
+      - name: Force resolve conflicts
         run: |
           git checkout --ours app.js || true
           git checkout --ours index.html || true
@@ -45,7 +48,7 @@ jobs:
 
       - name: Commit resolution
         run: |
-          git commit -m "Auto resolve conflicts in app.js and index.html" || true
+          git commit -m "Auto resolve conflicts" || true
 
       - name: Push changes
         run: |
