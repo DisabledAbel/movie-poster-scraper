@@ -19,6 +19,7 @@
       const statusEl = document.getElementById("status");
       const resultsEl = document.getElementById("results");
       const suggestionsEl = document.getElementById("suggestions");
+      const searchForm = document.getElementById("searchForm");
 
       async function getMoviePosters(title) {
         if (!title || !title.trim()) throw new Error("A movie title is required.");
@@ -141,6 +142,36 @@
         suggestionsEl.hidden = false;
       }
 
+      function renderPosterResults(posters) {
+        resultsEl.innerHTML = "";
+
+        posters.forEach((url, index) => {
+          const li = document.createElement("li");
+          li.className = "poster-item";
+
+          const preview = document.createElement("img");
+          preview.src = url;
+          preview.alt = `Poster preview ${index + 1}`;
+          preview.loading = "lazy";
+          preview.decoding = "async";
+          preview.className = "poster-preview";
+          preview.referrerPolicy = "no-referrer";
+          preview.addEventListener("error", () => {
+            preview.hidden = true;
+          }, { once: true });
+
+          const link = document.createElement("a");
+          link.href = url;
+          link.target = "_blank";
+          link.rel = "noopener noreferrer";
+          link.textContent = url;
+
+          li.appendChild(preview);
+          li.appendChild(link);
+          resultsEl.appendChild(li);
+        });
+      }
+
       async function updateSuggestions(query) {
         const trimmed = query.trim();
         latestQuery = trimmed;
@@ -170,6 +201,31 @@
         }
 
         renderSuggestions(mergedSuggestions);
+      }
+
+      async function runSearch() {
+        const title = titleInput.value.trim();
+        hideSuggestions();
+        statusEl.className = "status";
+        statusEl.textContent = "Searching...";
+        resultsEl.innerHTML = "";
+        searchBtn.disabled = true;
+
+        try {
+          const posters = await getMoviePosters(title);
+          if (!posters.length) {
+            statusEl.textContent = "No JPG/JPEG poster URLs found.";
+            return;
+          }
+
+          statusEl.textContent = `Found ${posters.length} poster URL(s):`;
+          renderPosterResults(posters);
+        } catch (err) {
+          statusEl.className = "status error";
+          statusEl.textContent = err.message;
+        } finally {
+          searchBtn.disabled = false;
+        }
       }
 
       titleInput.addEventListener("input", () => {
@@ -209,36 +265,7 @@
         }
       });
 
-      searchBtn.addEventListener("click", async () => {
-        const title = titleInput.value.trim();
-        hideSuggestions();
-        statusEl.className = "status";
-        statusEl.textContent = "Searching...";
-        resultsEl.innerHTML = "";
-        searchBtn.disabled = true;
-
-        try {
-          const posters = await getMoviePosters(title);
-          if (!posters.length) {
-            statusEl.textContent = "No JPG/JPEG poster URLs found.";
-            return;
-          }
-
-          statusEl.textContent = `Found ${posters.length} poster URL(s):`;
-          for (const url of posters) {
-            const li = document.createElement("li");
-            const a = document.createElement("a");
-            a.href = url;
-            a.target = "_blank";
-            a.rel = "noopener noreferrer";
-            a.textContent = url;
-            li.appendChild(a);
-            resultsEl.appendChild(li);
-          }
-        } catch (err) {
-          statusEl.className = "status error";
-          statusEl.textContent = err.message;
-        } finally {
-          searchBtn.disabled = false;
-        }
+      searchForm.addEventListener("submit", (event) => {
+        event.preventDefault();
+        runSearch();
       });

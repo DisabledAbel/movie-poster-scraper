@@ -13,6 +13,62 @@ This project provides a **movie poster API** using **Firecrawl** to fetch poster
 
 ---
 
+
+## Run locally (Windows + Linux)
+
+### Prerequisites
+
+- Node.js 18+
+- npm 9+
+- A Firecrawl API key
+
+### 1) Install dependencies
+
+```bash
+npm install
+```
+
+### 2) Create local environment file
+
+Copy `.env.local.example` to `.env.local` and set your key:
+
+```bash
+cp .env.local.example .env.local
+```
+
+Set:
+
+```text
+FIRECRAWL_API_KEY=your_firecrawl_api_key_here
+```
+
+### 3) Start locally
+
+#### Linux / macOS
+
+```bash
+npm run dev:linux
+```
+
+#### Windows (PowerShell)
+
+```powershell
+npm run dev:windows
+```
+
+### 4) Open the app
+
+- App: `http://localhost:3000`
+- API: `http://localhost:3000/api/scrape?movie=inception`
+
+You can also run the shared command directly on any platform:
+
+```bash
+npm run dev
+```
+
+---
+
 ## Deployment on Vercel
 
 1. Push your repository to GitHub:

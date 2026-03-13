@@ -4,5 +4,13 @@
   "type": "module",
   "dependencies": {
     "@mendable/firecrawl-js": "^1.5.0"
+  },
+  "scripts": {
+    "dev": "vercel dev --listen 3000",
+    "dev:linux": "bash ./scripts/run-local.sh",
+    "dev:windows": "powershell -ExecutionPolicy Bypass -File ./scripts/run-local.ps1"
+  },
+  "devDependencies": {
+    "vercel": "^39.1.0"
   }
 }

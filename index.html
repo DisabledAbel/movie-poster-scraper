@@ -60,6 +60,24 @@
       .status { margin-top: 14px; font-size: 0.95rem; }
       .error { color: var(--danger); }
       ul { margin: 12px 0 0; padding-left: 18px; }
+
+      #results {
+        list-style: none;
+        padding: 0;
+      }
+      .poster-item {
+        display: grid;
+        gap: 8px;
+        margin-bottom: 14px;
+      }
+      .poster-preview {
+        width: 100%;
+        max-width: 220px;
+        border-radius: 10px;
+        border: 1px solid #334155;
+        background: #020617;
+        object-fit: cover;
+      }
       li { margin-bottom: 8px; }
       a { color: #93c5fd; word-break: break-all; }
       .suggestions {
@@ -111,17 +129,17 @@
       <h1>Movie Poster Finder</h1>
       <p>Find direct movie poster URLs using Firecrawl. Works well on iPad in Safari/Chrome.</p>
 
-      <div class="grid">
+      <form id="searchForm" class="grid">
         <div>
           <label for="title">Movie Title</label>
           <input id="title" type="text" placeholder="Inception" autocomplete="off" />
           <ul id="suggestions" class="suggestions" hidden></ul>
         </div>
 
-        <button id="searchBtn">Find Top 5 Posters</button>
+        <button id="searchBtn" type="submit">Find Top 5 Posters</button>
         <div id="status" class="status"></div>
         <ul id="results"></ul>
-      </div>
+      </form>
     </main>
     <script src="/app.js"></script>
   </body>
