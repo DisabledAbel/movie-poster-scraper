@@ -62,39 +62,45 @@ export default async function handler(req, res) {
     });
 
     const candidates = searchResult?.data ?? [];
-
-    const directImageUrls = candidates
+    const mappedUrls = candidates
       .map((item) => item?.url || item?.link)
-      .filter((url) => typeof url === "string" && isImageUrl(url));
+      .filter((url) => typeof url === "string");
 
-    const pageUrls = candidates
-      .map((item) => item?.url || item?.link)
-      .filter((url) => typeof url === "string" && /^https?:\/\//.test(url))
+    const directImageUrls = mappedUrls.filter((url) => isImageUrl(url));
+    const directImageUrlSet = new Set(directImageUrls);
+
+    const pageUrls = mappedUrls
+      .filter((url) => /^https?:\/\//.test(url) && !directImageUrlSet.has(url))
       .slice(0, 6);
 
-    const scrapedImageUrls = [];
-
-    for (const pageUrl of pageUrls) {
-      try {
-        const scraped = await app.scrapeUrl(pageUrl, {
+    const scrapeResults = await Promise.allSettled(
+      pageUrls.map((pageUrl) =>
+        app.scrapeUrl(pageUrl, {
           formats: ["html"],
-        });
+        }),
+      ),
+    );
 
-        const html =
-          scraped?.html ||
-          scraped?.rawHtml ||
-          scraped?.data?.html ||
-          scraped?.data?.rawHtml ||
-          "";
-
-        if (!html) continue;
-
-        const imageUrls = extractImageUrls(html, pageUrl).filter(isImageUrl);
-        scrapedImageUrls.push(...imageUrls);
-      } catch {
-        // Continue best-effort across URLs.
+    const scrapedImageUrls = scrapeResults.flatMap((result, index) => {
+      if (result.status !== "fulfilled") {
+        return [];
       }
-    }
+
+      const pageUrl = pageUrls[index];
+      const scraped = result.value;
+      const html =
+        scraped?.html ||
+        scraped?.rawHtml ||
+        scraped?.data?.html ||
+        scraped?.data?.rawHtml ||
+        "";
+
+      if (!html) {
+        return [];
+      }
+
+      return extractImageUrls(html, pageUrl).filter(isImageUrl);
+    });
 
     const posters = rankPosterUrls([...directImageUrls, ...scrapedImageUrls]).slice(0, 5);
 
