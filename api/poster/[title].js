@@ -1,7 +1,11 @@
 import fs from "fs";
 import path from "path";
 import FirecrawlApp from "@mendable/firecrawl-js";
-import { extractImageCandidates, pickTopPosterUrls } from "./utils.js";
+import {
+  POSTER_SEARCH_LIMIT,
+  extractImageCandidates,
+  pickTopPosterUrls,
+} from "./utils.js";
 
 const CACHE_DIR = path.resolve(".cache");
 if (!fs.existsSync(CACHE_DIR)) fs.mkdirSync(CACHE_DIR);
@@ -21,7 +25,7 @@ export default async function handler(req, res) {
     const app = new FirecrawlApp({ apiKey: process.env.FIRECRAWL_API_KEY });
 
     const result = await app.search(`${title} movie poster`, {
-      limit: 10,
+      limit: POSTER_SEARCH_LIMIT,
       scrapeOptions: { formats: ["links"] },
     });
 

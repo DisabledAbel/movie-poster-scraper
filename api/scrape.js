@@ -1,5 +1,9 @@
 import FirecrawlApp from "@mendable/firecrawl-js";
-import { extractImageCandidates, pickTopPosterUrls } from "./poster/utils.js";
+import {
+  POSTER_SEARCH_LIMIT,
+  extractImageCandidates,
+  pickTopPosterUrls,
+} from "./poster/utils.js";
 
 export default async function handler(req, res) {
   try {
@@ -10,7 +14,7 @@ export default async function handler(req, res) {
     const movie = req.query.movie || "inception";
 
     const result = await app.search(`${movie} movie poster`, {
-      limit: 10,
+      limit: POSTER_SEARCH_LIMIT,
       scrapeOptions: {
         formats: ["links"],
       },

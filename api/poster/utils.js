@@ -1,3 +1,5 @@
+export const POSTER_SEARCH_LIMIT = 10;
+
 export function hasImageExtension(url) {
   return /\.(?:jpe?g|png|webp|gif|avif)(?:$|[?#])/i.test(url);
 }
