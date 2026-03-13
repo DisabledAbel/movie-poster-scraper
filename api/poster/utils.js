@@ -60,3 +60,13 @@ export function pickTopPosterUrls(candidates, limit = 5) {
   const relaxedMatches = ranked.filter((url) => isLikelyPosterImageUrl(url));
   return relaxedMatches.slice(0, limit);
 }
+
+
+export async function searchPosterCandidates(app, title) {
+  const result = await app.search(`${title} movie poster`, {
+    limit: POSTER_SEARCH_LIMIT,
+    scrapeOptions: { formats: ["links"] },
+  });
+
+  return pickTopPosterUrls(extractImageCandidates(result), 5);
+}
