@@ -14,6 +14,26 @@ function resolveRequestedPosterCount(rawValue) {
   return Math.min(MAX_POSTER_COUNT, Math.max(1, parsed));
 }
 
+function normalizeMovieTitle(value) {
+  if (typeof value !== "string") return "";
+  return value
+    .toLowerCase()
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function imdbTitleMatchScore(candidateTitle, requestedTitle) {
+  const candidate = normalizeMovieTitle(candidateTitle);
+  if (!candidate || !requestedTitle) return 0;
+  if (candidate === requestedTitle) return 6;
+  if (candidate.startsWith(requestedTitle) || requestedTitle.startsWith(candidate)) return 4;
+  if (candidate.includes(requestedTitle) || requestedTitle.includes(candidate)) return 2;
+  return 0;
+}
+
 function isPosterImageUrl(url) {
   return /\.(?:jpe?g|png|webp)(?:$|[?#])/i.test(url);
 }
@@ -74,6 +94,7 @@ function extractImageCandidates(result) {
 async function fetchImdbPosterCandidates(title) {
   const trimmedTitle = typeof title === "string" ? title.trim() : "";
   if (!trimmedTitle) return [];
+  const normalizedTitle = normalizeMovieTitle(trimmedTitle);
 
   const firstChar = trimmedTitle[0].toLowerCase();
   const imdbUrl = `https://v3.sg.media-imdb.com/suggestion/${encodeURIComponent(firstChar)}/${encodeURIComponent(trimmedTitle)}.json`;
@@ -84,8 +105,13 @@ async function fetchImdbPosterCandidates(title) {
   const payload = await response.json();
   const candidates = (payload?.d || [])
     .filter((item) => item?.id?.startsWith("tt"))
-    .map((item) => item?.i?.imageUrl)
-    .filter((url) => typeof url === "string");
+    .map((item) => ({
+      imageUrl: item?.i?.imageUrl,
+      matchScore: imdbTitleMatchScore(item?.l || item?.title, normalizedTitle),
+    }))
+    .filter((item) => item.matchScore > 0 && typeof item.imageUrl === "string")
+    .sort((a, b) => (posterScore(b.imageUrl) + b.matchScore * 10) - (posterScore(a.imageUrl) + a.matchScore * 10))
+    .map((item) => item.imageUrl);
 
   return dedupePosterUrls(candidates)
     .filter((url) => isPosterImageUrl(url))
