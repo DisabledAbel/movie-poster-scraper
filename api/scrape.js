@@ -1,6 +1,8 @@
 import FirecrawlApp from "@mendable/firecrawl-js";
 
 const IMAGE_URL_PATTERN = /https?:\/\/[^\s"'`<>()\[\]{}]+?\.(?:jpe?g)(?:\?[^\s"'`<>()\[\]{}]+)?/gi;
+const DEFAULT_POSTER_COUNT = 5;
+const MAX_POSTER_COUNT = 20;
 
 function normalizeImageUrl(value) {
   if (typeof value !== "string") return "";
@@ -130,29 +132,72 @@ function extractImageCandidates(result) {
   return urls;
 }
 
+function resolveRequestedPosterCount(rawValue) {
+  const parsed = Number.parseInt(rawValue, 10);
+  if (!Number.isFinite(parsed)) return DEFAULT_POSTER_COUNT;
+  return Math.min(MAX_POSTER_COUNT, Math.max(1, parsed));
+}
+
+async function fetchImdbPosterCandidates(movie) {
+  const trimmedMovie = typeof movie === "string" ? movie.trim() : "";
+  if (!trimmedMovie) return [];
+
+  const firstChar = trimmedMovie[0].toLowerCase();
+  const imdbUrl = `https://v3.sg.media-imdb.com/suggestion/${encodeURIComponent(firstChar)}/${encodeURIComponent(trimmedMovie)}.json`;
+
+  const response = await fetch(imdbUrl);
+  if (!response.ok) return [];
+
+  const payload = await response.json();
+  const candidates = (payload?.d || [])
+    .filter((item) => item?.id?.startsWith("tt"))
+    .map((item) => item?.i?.imageUrl)
+    .filter((url) => typeof url === "string");
+
+  return dedupePosterUrls(candidates)
+    .filter((url) => isPosterImageUrl(url))
+    .sort((a, b) => posterScore(b) - posterScore(a));
+}
+
 export default async function handler(req, res) {
   try {
-    const app = new FirecrawlApp({
-      apiKey: process.env.FIRECRAWL_API_KEY,
-    });
-
     const movie = req.query.movie || "inception";
+    const requestedCount = resolveRequestedPosterCount(req.query.count ?? req.query.limit);
+    let posters = [];
+    let source = "imdb";
 
-    const result = await app.search(`${movie} movie poster`, {
-      limit: 8,
-      scrapeOptions: {
-        formats: ["links", "markdown"],
-      },
-    });
+    try {
+      const app = new FirecrawlApp({
+        apiKey: process.env.FIRECRAWL_API_KEY,
+      });
 
-    const posters = dedupePosterUrls(extractImageCandidates(result))
-      .filter((url) => isPosterImageUrl(url))
-      .sort((a, b) => posterScore(b) - posterScore(a))
-      .slice(0, 5);
+      const result = await app.search(`${movie} movie poster`, {
+        limit: 8,
+        scrapeOptions: {
+          formats: ["links", "markdown"],
+        },
+      });
+
+      posters = dedupePosterUrls(extractImageCandidates(result))
+        .filter((url) => isPosterImageUrl(url))
+        .sort((a, b) => posterScore(b) - posterScore(a))
+        .slice(0, MAX_POSTER_COUNT);
+
+      source = "firecrawl";
+    } catch {
+      posters = [];
+    }
+
+    if (!posters.length) {
+      posters = (await fetchImdbPosterCandidates(movie)).slice(0, MAX_POSTER_COUNT);
+      source = "imdb";
+    }
 
     res.status(200).json({
       movie,
-      posters,
+      posters: posters.slice(0, requestedCount),
+      requestedCount,
+      source,
     });
   } catch (err) {
     res.status(500).json({

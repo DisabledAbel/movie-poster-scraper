@@ -16,14 +16,16 @@
 
       const titleInput = document.getElementById("title");
       const searchBtn = document.getElementById("searchBtn");
+      const countInput = document.getElementById("count");
       const statusEl = document.getElementById("status");
       const resultsEl = document.getElementById("results");
       const suggestionsEl = document.getElementById("suggestions");
       const searchForm = document.getElementById("searchForm");
 
-      async function getMoviePosters(title) {
+      async function getMoviePosters(title, count) {
         if (!title || !title.trim()) throw new Error("A movie title is required.");
-        const response = await fetch(`/api/scrape?movie=${encodeURIComponent(title)}`);
+        const safeCount = Number.isFinite(count) ? Math.max(1, Math.min(20, Math.trunc(count))) : 5;
+        const response = await fetch(`/api/scrape?movie=${encodeURIComponent(title)}&count=${encodeURIComponent(safeCount)}`);
         const payload = await response.json();
 
         if (!response.ok) {
@@ -205,6 +207,7 @@
 
       async function runSearch() {
         const title = titleInput.value.trim();
+        const count = Number.parseInt(countInput.value, 10) || 5;
         hideSuggestions();
         statusEl.className = "status";
         statusEl.textContent = "Searching...";
@@ -212,7 +215,7 @@
         searchBtn.disabled = true;
 
         try {
-          const posters = await getMoviePosters(title);
+          const posters = await getMoviePosters(title, count);
           if (!posters.length) {
             statusEl.textContent = "No JPG/JPEG poster URLs found.";
             return;

@@ -5,6 +5,15 @@ import FirecrawlApp from "@mendable/firecrawl-js";
 const CACHE_DIR = path.resolve(".cache");
 if (!fs.existsSync(CACHE_DIR)) fs.mkdirSync(CACHE_DIR);
 
+const DEFAULT_POSTER_COUNT = 5;
+const MAX_POSTER_COUNT = 20;
+
+function resolveRequestedPosterCount(rawValue) {
+  const parsed = Number.parseInt(rawValue, 10);
+  if (!Number.isFinite(parsed)) return DEFAULT_POSTER_COUNT;
+  return Math.min(MAX_POSTER_COUNT, Math.max(1, parsed));
+}
+
 function isPosterImageUrl(url) {
   return /\.(?:jpe?g|png|webp)(?:$|[?#])/i.test(url);
 }
@@ -39,33 +48,69 @@ function extractImageCandidates(result) {
   return urls;
 }
 
+async function fetchImdbPosterCandidates(title) {
+  const trimmedTitle = typeof title === "string" ? title.trim() : "";
+  if (!trimmedTitle) return [];
+
+  const firstChar = trimmedTitle[0].toLowerCase();
+  const imdbUrl = `https://v3.sg.media-imdb.com/suggestion/${encodeURIComponent(firstChar)}/${encodeURIComponent(trimmedTitle)}.json`;
+
+  const response = await fetch(imdbUrl);
+  if (!response.ok) return [];
+
+  const payload = await response.json();
+  const candidates = (payload?.d || [])
+    .filter((item) => item?.id?.startsWith("tt"))
+    .map((item) => item?.i?.imageUrl)
+    .filter((url) => typeof url === "string");
+
+  return [...new Set(candidates)]
+    .filter((url) => isPosterImageUrl(url))
+    .sort((a, b) => posterScore(b) - posterScore(a));
+}
+
 export default async function handler(req, res) {
   try {
     const title = req.query.title;
     if (!title) return res.status(400).json({ error: "Missing title" });
+    const requestedCount = resolveRequestedPosterCount(req.query.count ?? req.query.limit);
 
     const safeFile = path.join(CACHE_DIR, `${title.toLowerCase()}.json`);
 
     if (fs.existsSync(safeFile)) {
       const data = JSON.parse(fs.readFileSync(safeFile, "utf-8"));
-      return res.status(200).json(data);
+      return res.status(200).json({
+        title: data.title || title,
+        posters: Array.isArray(data.posters) ? data.posters.slice(0, requestedCount) : [],
+        requestedCount,
+      });
     }
 
-    const app = new FirecrawlApp({ apiKey: process.env.FIRECRAWL_API_KEY });
+    let posters = [];
 
-    const result = await app.search(`${title} movie poster`, {
-      limit: 8,
-      scrapeOptions: { formats: ["links"] },
-    });
+    try {
+      const app = new FirecrawlApp({ apiKey: process.env.FIRECRAWL_API_KEY });
 
-    const posters = [...new Set(extractImageCandidates(result))]
-      .filter((url) => isPosterImageUrl(url))
-      .sort((a, b) => posterScore(b) - posterScore(a))
-      .slice(0, 5);
+      const result = await app.search(`${title} movie poster`, {
+        limit: 8,
+        scrapeOptions: { formats: ["links"] },
+      });
+
+      posters = [...new Set(extractImageCandidates(result))]
+        .filter((url) => isPosterImageUrl(url))
+        .sort((a, b) => posterScore(b) - posterScore(a))
+        .slice(0, MAX_POSTER_COUNT);
+    } catch {
+      posters = [];
+    }
+
+    if (!posters.length) {
+      posters = (await fetchImdbPosterCandidates(title)).slice(0, MAX_POSTER_COUNT);
+    }
 
     fs.writeFileSync(safeFile, JSON.stringify({ title, posters }));
 
-    res.status(200).json({ title, posters });
+    res.status(200).json({ title, posters: posters.slice(0, requestedCount), requestedCount });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

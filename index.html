@@ -136,7 +136,12 @@
           <ul id="suggestions" class="suggestions" hidden></ul>
         </div>
 
-        <button id="searchBtn" type="submit">Find Top 5 Posters</button>
+        <div>
+          <label for="count">How many posters?</label>
+          <input id="count" type="number" min="1" max="20" step="1" value="5" inputmode="numeric" />
+        </div>
+
+        <button id="searchBtn" type="submit">Find Posters</button>
         <div id="status" class="status"></div>
         <ul id="results"></ul>
       </form>
