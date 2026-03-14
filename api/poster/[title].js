@@ -74,6 +74,23 @@ function dedupePosterUrls(urls) {
   return deduped;
 }
 
+function dedupePosterCandidatesByUrl(candidates) {
+  const deduped = [];
+  const seen = new Set();
+
+  for (const candidate of candidates) {
+    const url = candidate?.imageUrl;
+    if (typeof url !== "string") continue;
+
+    const key = canonicalPosterKey(url);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    deduped.push(candidate);
+  }
+
+  return deduped;
+}
+
 function extractImageCandidates(result) {
   const urls = [];
   const items = Array.isArray(result?.data) ? result.data : [];
@@ -104,19 +121,18 @@ async function fetchImdbPosterCandidates(title) {
   if (!response.ok) return [];
 
   const payload = await response.json();
-  const candidates = (payload?.d || [])
+  const rankedCandidates = (payload?.d || [])
     .filter((item) => item?.id?.startsWith("tt"))
     .map((item) => ({
       imageUrl: item?.i?.imageUrl,
       matchScore: imdbTitleMatchScore(item?.l || item?.title, normalizedTitle),
     }))
     .filter((item) => item.matchScore > 0 && typeof item.imageUrl === "string")
-    .sort((a, b) => (posterScore(b.imageUrl) + b.matchScore * 10) - (posterScore(a.imageUrl) + a.matchScore * 10))
-    .map((item) => item.imageUrl);
+    .sort((a, b) => (posterScore(b.imageUrl) + b.matchScore * 10) - (posterScore(a.imageUrl) + a.matchScore * 10));
 
-  return dedupePosterUrls(candidates)
-    .filter((url) => isPosterImageUrl(url))
-    .sort((a, b) => posterScore(b) - posterScore(a));
+  return dedupePosterCandidatesByUrl(rankedCandidates)
+    .map((item) => item.imageUrl)
+    .filter((url) => isPosterImageUrl(url));
 }
 
 export default async function handler(req, res) {
