@@ -30,7 +30,6 @@ function posterScore(url) {
   return score;
 }
 
-
 function canonicalPosterKey(url) {
   try {
     const parsed = new URL(url);
@@ -107,10 +106,12 @@ export default async function handler(req, res) {
         title: data.title || title,
         posters: Array.isArray(data.posters) ? data.posters.slice(0, requestedCount) : [],
         requestedCount,
+        source: "cache",
       });
     }
 
     let posters = [];
+    let source = "imdb";
 
     try {
       const app = new FirecrawlApp({ apiKey: process.env.FIRECRAWL_API_KEY });
@@ -124,17 +125,19 @@ export default async function handler(req, res) {
         .filter((url) => isPosterImageUrl(url))
         .sort((a, b) => posterScore(b) - posterScore(a))
         .slice(0, MAX_POSTER_COUNT);
+      source = "firecrawl";
     } catch {
       posters = [];
     }
 
     if (!posters.length) {
       posters = (await fetchImdbPosterCandidates(title)).slice(0, MAX_POSTER_COUNT);
+      source = "imdb";
     }
 
     fs.writeFileSync(safeFile, JSON.stringify({ title, posters }));
 
-    res.status(200).json({ title, posters: posters.slice(0, requestedCount), requestedCount });
+    res.status(200).json({ title, posters: posters.slice(0, requestedCount), requestedCount, source });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
