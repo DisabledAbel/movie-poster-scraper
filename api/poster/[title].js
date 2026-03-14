@@ -43,9 +43,10 @@ function posterScore(url) {
   let score = 0;
 
   if (/(poster|cover|movie|theatrical)/.test(lower)) score += 3;
+  if (/(imdb|tmdb|wikipedia|fanart|movieposterdb|theposterdb)/.test(lower)) score += 2;
   if (/(\d{3,4})x(\d{3,4})/.test(lower)) score += 2;
   if (/(vertical|large|original|hires|full)/.test(lower)) score += 1;
-  if (/(thumb|small|icon|avatar|logo)/.test(lower)) score -= 2;
+  if (/(thumb|small|icon|avatar|logo|sprite|banner)/.test(lower)) score -= 2;
 
   return score;
 }
