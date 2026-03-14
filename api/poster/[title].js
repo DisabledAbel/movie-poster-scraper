@@ -30,6 +30,30 @@ function posterScore(url) {
   return score;
 }
 
+
+function canonicalPosterKey(url) {
+  try {
+    const parsed = new URL(url);
+    return `${parsed.hostname.toLowerCase()}${decodeURIComponent(parsed.pathname).replace(/\/+/g, "/").toLowerCase()}`;
+  } catch {
+    return String(url || "").trim().toLowerCase();
+  }
+}
+
+function dedupePosterUrls(urls) {
+  const deduped = [];
+  const seen = new Set();
+
+  for (const url of urls) {
+    const key = canonicalPosterKey(url);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    deduped.push(url);
+  }
+
+  return deduped;
+}
+
 function extractImageCandidates(result) {
   const urls = [];
   const items = Array.isArray(result?.data) ? result.data : [];
@@ -64,7 +88,7 @@ async function fetchImdbPosterCandidates(title) {
     .map((item) => item?.i?.imageUrl)
     .filter((url) => typeof url === "string");
 
-  return [...new Set(candidates)]
+  return dedupePosterUrls(candidates)
     .filter((url) => isPosterImageUrl(url))
     .sort((a, b) => posterScore(b) - posterScore(a));
 }
@@ -96,7 +120,7 @@ export default async function handler(req, res) {
         scrapeOptions: { formats: ["links"] },
       });
 
-      posters = [...new Set(extractImageCandidates(result))]
+      posters = dedupePosterUrls(extractImageCandidates(result))
         .filter((url) => isPosterImageUrl(url))
         .sort((a, b) => posterScore(b) - posterScore(a))
         .slice(0, MAX_POSTER_COUNT);
