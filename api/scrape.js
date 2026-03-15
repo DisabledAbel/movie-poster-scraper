@@ -130,7 +130,17 @@ function extractImageCandidates(result) {
   return urls;
 }
 
-async function fetchImdbPosterCandidates(movie) {
+function normalizeYear(value) {
+  if (value === undefined || value === null || value === "") return null;
+  const parsedYear = Number.parseInt(String(value), 10);
+  if (!Number.isInteger(parsedYear) || parsedYear < 1888 || parsedYear > 3000) {
+    return null;
+  }
+
+  return parsedYear;
+}
+
+async function fetchImdbPosterCandidates(movie, year) {
   const trimmedMovie = typeof movie === "string" ? movie.trim() : "";
   if (!trimmedMovie) return [];
 
@@ -141,10 +151,18 @@ async function fetchImdbPosterCandidates(movie) {
   if (!response.ok) return [];
 
   const payload = await response.json();
-  const candidates = (payload?.d || [])
+  const allCandidates = (payload?.d || [])
     .filter((item) => item?.id?.startsWith("tt"))
+    .filter((item) => year === null || item?.y === year)
     .map((item) => item?.i?.imageUrl)
     .filter((url) => typeof url === "string");
+
+  const candidates = allCandidates.length
+    ? allCandidates
+    : (payload?.d || [])
+        .filter((item) => item?.id?.startsWith("tt"))
+        .map((item) => item?.i?.imageUrl)
+        .filter((url) => typeof url === "string");
 
   return dedupePosterUrls(candidates)
     .filter((url) => isPosterImageUrl(url))
@@ -154,6 +172,7 @@ async function fetchImdbPosterCandidates(movie) {
 export default async function handler(req, res) {
   try {
     const movie = req.query.movie || "inception";
+    const year = normalizeYear(req.query.year);
     let posters = [];
     let source = "imdb";
 
@@ -162,7 +181,8 @@ export default async function handler(req, res) {
         apiKey: process.env.FIRECRAWL_API_KEY,
       });
 
-      const result = await app.search(`${movie} movie poster`, {
+      const searchQuery = year ? `${movie} ${year} movie poster` : `${movie} movie poster`;
+      const result = await app.search(searchQuery, {
         limit: 8,
         scrapeOptions: {
           formats: ["links", "markdown"],
@@ -180,12 +200,13 @@ export default async function handler(req, res) {
     }
 
     if (!posters.length) {
-      posters = (await fetchImdbPosterCandidates(movie)).slice(0, 5);
+      posters = (await fetchImdbPosterCandidates(movie, year)).slice(0, 5);
       source = "imdb";
     }
 
     res.status(200).json({
       movie,
+      year,
       posters,
       source,
     });

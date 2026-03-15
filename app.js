@@ -5,7 +5,8 @@
         "Spider-Man: No Way Home", "Avengers: Endgame", "Iron Man", "Black Panther", "Doctor Strange",
         "The Lord of the Rings", "The Hobbit", "Harry Potter", "Star Wars", "Jurassic Park", "Top Gun: Maverick",
         "Mission: Impossible", "John Wick", "The Lion King", "Frozen", "Coco", "Inside Out",
-        "Whiplash", "Parasite", "La La Land", "The Social Network", "Blade Runner 2049", "The Prestige"
+        "Whiplash", "Parasite", "La La Land", "The Social Network", "Blade Runner 2049", "The Prestige",
+        "The Thing (1982)", "The Thing (2011)"
       ];
 
       const MAX_SUGGESTIONS = 8;
@@ -21,9 +22,31 @@
       const suggestionsEl = document.getElementById("suggestions");
       const searchForm = document.getElementById("searchForm");
 
-      async function getMoviePosters(title) {
-        if (!title || !title.trim()) throw new Error("A movie title is required.");
-        const response = await fetch(`/api/scrape?movie=${encodeURIComponent(title)}`);
+      function splitTitleAndYear(value) {
+        const raw = typeof value === "string" ? value.trim() : "";
+        if (!raw) return { movie: "", year: "" };
+
+        const parenMatch = raw.match(/^(.*)\((\d{4})\)\s*$/);
+        if (parenMatch) {
+          return {
+            movie: parenMatch[1].trim(),
+            year: parenMatch[2],
+          };
+        }
+
+        return { movie: raw, year: "" };
+      }
+
+      async function getMoviePosters(searchText) {
+        const { movie, year } = splitTitleAndYear(searchText);
+        if (!movie) throw new Error("A movie title is required.");
+
+        const params = new URLSearchParams({ movie });
+        if (/^\d{4}$/.test(year)) {
+          params.set("year", year);
+        }
+
+        const response = await fetch(`/api/scrape?${params.toString()}`);
         const payload = await response.json();
 
         if (!response.ok) {
@@ -43,7 +66,20 @@
       }
 
       function normalizeWikiTitle(title) {
-        return title
+        const raw = String(title || "").trim();
+        if (!raw) return "";
+
+        const yearQualifiedMatch = raw.match(/\((\d{4})\s+(?:film|movie)[^)]*\)/i);
+        if (yearQualifiedMatch) {
+          const baseTitle = raw
+            .replace(/\s*\((\d{4})\s+(?:film|movie)[^)]*\)\s*/i, "")
+            .replace(/\s+/g, " ")
+            .trim();
+
+          return baseTitle ? `${baseTitle} (${yearQualifiedMatch[1]})` : "";
+        }
+
+        return raw
           .replace(/\s*\([^)]*film[^)]*\)\s*/gi, "")
           .replace(/\s*\([^)]*movie[^)]*\)\s*/gi, "")
           .replace(/\s+/g, " ")
