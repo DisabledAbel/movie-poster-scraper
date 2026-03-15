@@ -20,15 +20,29 @@
       const resultsEl = document.getElementById("results");
       const suggestionsEl = document.getElementById("suggestions");
       const searchForm = document.getElementById("searchForm");
-      const yearInput = document.getElementById("year");
 
-      async function getMoviePosters(title, year) {
-        if (!title || !title.trim()) throw new Error("A movie title is required.");
+      function splitTitleAndYear(value) {
+        const raw = typeof value === "string" ? value.trim() : "";
+        if (!raw) return { movie: "", year: "" };
 
-        const params = new URLSearchParams({ movie: title });
-        const trimmedYear = typeof year === "string" ? year.trim() : "";
-        if (/^\d{4}$/.test(trimmedYear)) {
-          params.set("year", trimmedYear);
+        const parenMatch = raw.match(/^(.*)\((\d{4})\)\s*$/);
+        if (parenMatch) {
+          return {
+            movie: parenMatch[1].trim(),
+            year: parenMatch[2],
+          };
+        }
+
+        return { movie: raw, year: "" };
+      }
+
+      async function getMoviePosters(searchText) {
+        const { movie, year } = splitTitleAndYear(searchText);
+        if (!movie) throw new Error("A movie title is required.");
+
+        const params = new URLSearchParams({ movie });
+        if (/^\d{4}$/.test(year)) {
+          params.set("year", year);
         }
 
         const response = await fetch(`/api/scrape?${params.toString()}`);
@@ -213,7 +227,6 @@
 
       async function runSearch() {
         const title = titleInput.value.trim();
-        const year = yearInput?.value || "";
         hideSuggestions();
         statusEl.className = "status";
         statusEl.textContent = "Searching...";
@@ -221,7 +234,7 @@
         searchBtn.disabled = true;
 
         try {
-          const posters = await getMoviePosters(title, year);
+          const posters = await getMoviePosters(title);
           if (!posters.length) {
             statusEl.textContent = "No JPG/JPEG poster URLs found.";
             return;
