@@ -109,13 +109,17 @@ Search posters for a movie:
 
 ```text
 GET /api/scrape?movie=avatar
+GET /api/scrape?movie=the+thing&year=1982
 ```
+
+`year` is optional and helps disambiguate movies with the same title.
 
 **Response:**
 
 ```json
 {
   "movie": "avatar",
+  "year": null,
   "posters": [
     "https://example.com/poster1.jpg",
     "https://example.com/poster2.jpg"
