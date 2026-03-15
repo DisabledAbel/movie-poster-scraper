@@ -20,10 +20,18 @@
       const resultsEl = document.getElementById("results");
       const suggestionsEl = document.getElementById("suggestions");
       const searchForm = document.getElementById("searchForm");
+      const yearInput = document.getElementById("year");
 
-      async function getMoviePosters(title) {
+      async function getMoviePosters(title, year) {
         if (!title || !title.trim()) throw new Error("A movie title is required.");
-        const response = await fetch(`/api/scrape?movie=${encodeURIComponent(title)}`);
+
+        const params = new URLSearchParams({ movie: title });
+        const trimmedYear = typeof year === "string" ? year.trim() : "";
+        if (/^\d{4}$/.test(trimmedYear)) {
+          params.set("year", trimmedYear);
+        }
+
+        const response = await fetch(`/api/scrape?${params.toString()}`);
         const payload = await response.json();
 
         if (!response.ok) {
@@ -205,6 +213,7 @@
 
       async function runSearch() {
         const title = titleInput.value.trim();
+        const year = yearInput?.value || "";
         hideSuggestions();
         statusEl.className = "status";
         statusEl.textContent = "Searching...";
@@ -212,7 +221,7 @@
         searchBtn.disabled = true;
 
         try {
-          const posters = await getMoviePosters(title);
+          const posters = await getMoviePosters(title, year);
           if (!posters.length) {
             statusEl.textContent = "No JPG/JPEG poster URLs found.";
             return;
