@@ -9,6 +9,7 @@ This project provides a **movie poster API** using **Firecrawl** to fetch poster
 * Search for movie posters by title
 * Returns multiple poster URLs as JSON
 * Optional caching for repeated requests
+* Multi-source fallback chain (Firecrawl → IMDb → iTunes → Wikipedia)
 * CDN-style direct image URL endpoints for Plex or apps
 
 ---
@@ -123,7 +124,9 @@ GET /api/scrape?movie=the+thing&year=1982
   "posters": [
     "https://example.com/poster1.jpg",
     "https://example.com/poster2.jpg"
-  ]
+  ],
+  "source": "imdb",
+  "sourcesTried": ["firecrawl", "imdb"]
 }
 ```
 
@@ -145,7 +148,9 @@ GET /api/poster/inception
   "posters": [
     "https://example.com/poster1.jpg",
     "https://example.com/poster2.jpg"
-  ]
+  ],
+  "source": "imdb",
+  "sourcesTried": ["firecrawl", "imdb"]
 }
 ```
 
