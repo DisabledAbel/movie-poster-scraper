@@ -9,6 +9,7 @@ This project provides a **movie poster API** using **Firecrawl** to fetch poster
 * Search for movie posters by title
 * Returns multiple poster URLs as JSON
 * Optional caching for repeated requests
+* Multi-source fallback chain (Firecrawl → IMDb → iTunes → Wikipedia)
 * CDN-style direct image URL endpoints for Plex or apps
 
 ---
@@ -20,7 +21,7 @@ This project provides a **movie poster API** using **Firecrawl** to fetch poster
 
 - Node.js 18+
 - npm 9+
-- A Firecrawl API key (**Fallback IMDb endpoint if there is no API key in ENVs.**
+- Firecrawl API key is optional (when omitted, the scraper falls back to IMDb/iTunes/Wikipedia sources).
 
 ### 1) Install dependencies
 
@@ -69,6 +70,37 @@ npm run dev
 
 ---
 
+
+## CLI: Save a poster JPG to local disk
+
+You can run the standalone script to fetch poster URLs and optionally download one as a local `.jpg` file:
+
+```bash
+node firecrawl-movie-posters.js "The Matrix"
+```
+
+Save the best match to a local file:
+
+```bash
+node firecrawl-movie-posters.js "The Matrix" --save
+```
+
+Save to a custom location:
+
+```bash
+node firecrawl-movie-posters.js "The Matrix" --save --output ./posters/the-matrix.jpg
+```
+
+Choose which result to save (0-based index):
+
+```bash
+node firecrawl-movie-posters.js "The Matrix" --save --index 1
+```
+
+Optionally, set `FIRECRAWL_API_KEY` to include Firecrawl as an additional source, but it is not required for CLI usage.
+
+---
+
 ## Deployment on Vercel
 
 1. Push your repository to GitHub:
@@ -87,7 +119,7 @@ FIRECRAWL_API_KEY
 ```
 
 Value: your Firecrawl API key.
-**Fallback IMDb endpoint if there is no API key in ENVs.**
+**When FIRECRAWL_API_KEY is missing, the app falls back to IMDb/iTunes/Wikipedia sources.**
 
 4. Deploy. Your API will be available at:
 
@@ -123,7 +155,9 @@ GET /api/scrape?movie=the+thing&year=1982
   "posters": [
     "https://example.com/poster1.jpg",
     "https://example.com/poster2.jpg"
-  ]
+  ],
+  "source": "imdb",
+  "sourcesTried": ["firecrawl", "imdb"]
 }
 ```
 
@@ -145,7 +179,9 @@ GET /api/poster/inception
   "posters": [
     "https://example.com/poster1.jpg",
     "https://example.com/poster2.jpg"
-  ]
+  ],
+  "source": "imdb",
+  "sourcesTried": ["firecrawl", "imdb"]
 }
 ```
 
