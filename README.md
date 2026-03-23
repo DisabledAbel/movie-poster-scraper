@@ -23,13 +23,20 @@ This project provides a **movie poster API** using **Firecrawl** to fetch poster
 - npm 9+
 - Firecrawl API key is optional (when omitted, the scraper falls back to IMDb/iTunes/Wikipedia sources).
 
-### 1) Install dependencies
+### 1) Clone the repository
+
+```bash
+git clone https://github.com/<your-username>/movie-poster-scraper.git
+cd movie-poster-scraper
+```
+
+### 2) Install dependencies
 
 ```bash
 npm install
 ```
 
-### 2) Create local environment file
+### 3) Create local environment file
 
 Copy `.env.local.example` to `.env.local` and set your key:
 
@@ -43,7 +50,7 @@ Set:
 FIRECRAWL_API_KEY=your_firecrawl_api_key_here
 ```
 
-### 3) Start locally
+### 4) Start locally
 
 #### Linux / macOS
 
@@ -57,7 +64,7 @@ npm run dev:linux
 npm run dev:windows
 ```
 
-### 4) Open the app
+### 5) Open the app
 
 - App: `http://localhost:3000`
 - API: `http://localhost:3000/api/scrape?movie=inception`
