@@ -1,52 +1,58 @@
-name: Resolve PR Conflicts
+name: Auto Fix Conflicts
 
 on:
+  pull_request:
+    types: [opened, synchronize, reopened]
   workflow_dispatch:
-
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+    inputs:
+      branch:
+        description: "Branch to fix"
+        required: false
+        default: ""
 
 jobs:
-  resolve:
+  auto-fix:
     runs-on: ubuntu-latest
-
     permissions:
       contents: write
       pull-requests: write
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - name: Checkout repo
+        uses: actions/checkout@v5
         with:
+          ref: ${{ github.event.inputs.branch || github.head_ref }}
+          token: ${{ secrets.GITHUB_TOKEN }}
           fetch-depth: 0
 
-      - name: Configure git
+      - name: Configure git identity
         run: |
           git config user.name "conflict-bot"
-          git config user.email "actions@github.com"
+          git config user.email "bot@example.com"
 
-      - name: Fetch branches
+      - name: Fetch base branch
+        run: git fetch origin main
+
+      - name: Try auto-merge (prefer incoming changes)
+        run: git merge -X theirs origin/main || true
+
+      - name: Detect conflicts
+        id: conflicts
         run: |
-          git fetch origin main
-          git fetch origin pull/6/head:pr6
+          files=$(git diff --name-only --diff-filter=U)
+          echo "files=$files" >> $GITHUB_OUTPUT
 
-      - name: Checkout PR branch
-        run: git checkout pr6
-
-      - name: Merge main
+      - name: Auto resolve conflicts (fallback)
+        if: steps.conflicts.outputs.files != ''
         run: |
-          git merge origin/main || true
+          for file in ${{ steps.conflicts.outputs.files }}; do
+            echo "Resolving $file"
+            git checkout --theirs $file
+            git add $file
+          done
 
-      - name: Resolve known conflicts
+      - name: Commit & push changes
         run: |
-          git checkout --ours app.js || true
-          git checkout --ours index.html || true
-          git add app.js index.html || true
-
-      - name: Commit if needed
-        run: |
-          git commit -m "Auto resolve conflicts" || echo "Nothing to commit"
-
-      - name: Push fix
-        run: |
-          git push origin pr6 --force-with-lease
+          git add .
+          git commit -m "🤖 Auto-resolved merge conflicts" || echo "No changes"
+          git push
