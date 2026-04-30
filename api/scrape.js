@@ -1,6 +1,16 @@
 import FirecrawlApp from "@mendable/firecrawl-js";
 
-const IMAGE_URL_PATTERN = /https?:\/\/[^\s"'`<>()\[\]{}]+?\.(?:jpe?g)(?:\?[^\s"'`<>()\[\]{}]+)?/gi;
+/* -----------------------------
+   URL + IMAGE VALIDATION
+----------------------------- */
+
+function safeParseUrl(url) {
+  try {
+    return new URL(url);
+  } catch {
+    return null;
+  }
+}
 
 function normalizeImageUrl(value) {
   if (typeof value !== "string") return "";
@@ -10,85 +20,36 @@ function normalizeImageUrl(value) {
     .replace(/[\u201d\u2019]+$/g, "");
 }
 
-function decodePossibleUrl(url) {
-  try {
-    return decodeURIComponent(url);
-  } catch {
-    return url;
-  }
-}
-
 function looksLikeCleanImageUrl(url) {
   if (typeof url !== "string") return false;
 
-  const trimmed = url.trim();
+  const trimmed = normalizeImageUrl(url);
   if (!/^https?:\/\//i.test(trimmed)) return false;
-  if (/[\s<>{}[\]`]/.test(trimmed)) return false;
 
-  const decoded = decodePossibleUrl(trimmed).toLowerCase();
-  if (decoded.includes("[homepage]") || decoded.includes("add to favorites")) return false;
-  if (/\.(?:jpe?g)(?:$|[?#])/i.test(trimmed) === false) return false;
+  const parsed = safeParseUrl(trimmed);
+  if (!parsed) return false;
 
-  try {
-    const parsed = new URL(trimmed);
-    const pathAndQuery = `${parsed.pathname}${parsed.search}`;
-    if (/\[(?:[^\]]*)\]|\((?:[^)]*)\)/.test(pathAndQuery)) return false;
-    if (/%5b|%5d/i.test(pathAndQuery)) return false;
-    if (pathAndQuery.length > 260) return false;
-    return true;
-  } catch {
-    return false;
-  }
+  const full = `${parsed.pathname}${parsed.search}`.toLowerCase();
+
+  if (!/\.(jpe?g)(?:$|[?#])/.test(full)) return false;
+  if (/[<>{}[\]`]/.test(full)) return false;
+  if (/%5b|%5d/.test(full)) return false;
+  if (full.length > 260) return false;
+
+  return true;
 }
+
+/* -----------------------------
+   EXTRACTION
+----------------------------- */
+
+const IMAGE_URL_PATTERN =
+  /https?:\/\/[^\s"'`<>()\[\]{}]+?\.(?:jpe?g)(?:\?[^\s"'`<>()\[\]{}]+)?/gi;
 
 function extractImageUrlsFromText(text) {
   if (typeof text !== "string") return [];
   const matches = text.match(IMAGE_URL_PATTERN) || [];
-  return matches
-    .map((url) => normalizeImageUrl(url))
-    .filter((url) => looksLikeCleanImageUrl(url));
-}
-
-function isPosterImageUrl(url) {
-  return looksLikeCleanImageUrl(url);
-}
-
-function canonicalPosterKey(url) {
-  try {
-    const parsed = new URL(url);
-    const hostname = parsed.hostname.toLowerCase();
-    const pathname = decodePossibleUrl(parsed.pathname).replace(/\/+/g, "/").toLowerCase();
-    return `${hostname}${pathname}`;
-  } catch {
-    return normalizeImageUrl(url).toLowerCase();
-  }
-}
-
-function dedupePosterUrls(urls) {
-  const deduped = [];
-  const seenKeys = new Set();
-
-  for (const url of urls) {
-    const key = canonicalPosterKey(url);
-    if (seenKeys.has(key)) continue;
-    seenKeys.add(key);
-    deduped.push(url);
-  }
-
-  return deduped;
-}
-
-function posterScore(url) {
-  const lower = url.toLowerCase();
-  let score = 0;
-
-  if (/(poster|cover|movie|theatrical)/.test(lower)) score += 3;
-  if (/(imdb|tmdb|wikipedia|fanart|movieposterdb|theposterdb|itunes|apple)/.test(lower)) score += 2;
-  if (/(\d{3,4})x(\d{3,4})/.test(lower)) score += 2;
-  if (/(vertical|large|original|hires|full)/.test(lower)) score += 1;
-  if (/(thumb|small|icon|avatar|logo|sprite|banner)/.test(lower)) score -= 2;
-
-  return score;
+  return matches.map(normalizeImageUrl);
 }
 
 function extractImageCandidates(result) {
@@ -100,9 +61,7 @@ function extractImageCandidates(result) {
 
     if (typeof value === "string") {
       urls.push(...extractImageUrlsFromText(value));
-      if (isPosterImageUrl(value)) {
-        urls.push(normalizeImageUrl(value));
-      }
+      urls.push(normalizeImageUrl(value));
       return;
     }
 
@@ -115,12 +74,9 @@ function extractImageCandidates(result) {
       if (seenObjects.has(value)) return;
       seenObjects.add(value);
 
-      const directUrlFields = ["url", "href", "src", "image", "imageUrl"];
-      for (const field of directUrlFields) {
-        if (typeof value[field] === "string") {
-          visit(value[field]);
-        }
-      }
+      ["url", "href", "src", "image", "imageUrl"].forEach((key) => {
+        if (typeof value[key] === "string") visit(value[key]);
+      });
 
       Object.values(value).forEach(visit);
     }
@@ -130,169 +86,239 @@ function extractImageCandidates(result) {
   return urls;
 }
 
-function normalizeYear(value) {
-  if (value === undefined || value === null || value === "") return null;
-  const parsedYear = Number.parseInt(String(value), 10);
-  if (!Number.isInteger(parsedYear) || parsedYear < 1888 || parsedYear > 3000) {
-    return null;
+/* -----------------------------
+   DEDUPE + SCORING
+----------------------------- */
+
+function canonicalPosterKey(url) {
+  const parsed = safeParseUrl(url);
+  if (!parsed) return null;
+
+  const hostname = parsed.hostname.toLowerCase();
+  const pathname = parsed.pathname.replace(/\/+/g, "/").toLowerCase();
+  return `${hostname}${pathname}`;
+}
+
+function dedupePosterUrls(urls) {
+  const seen = new Set();
+  const output = [];
+
+  for (const url of urls) {
+    const key = canonicalPosterKey(url);
+    if (!key) continue;
+
+    if (!seen.has(key)) {
+      seen.add(key);
+      output.push(url);
+    }
   }
 
-  return parsedYear;
+  return output;
+}
+
+function posterScore(url) {
+  const lower = url.toLowerCase();
+  let score = 0;
+
+  if (/(poster|cover|theatrical)/.test(lower)) score += 4;
+  if (/(imdb|tmdb|itunes|apple|fanart|posterdb)/.test(lower)) score += 3;
+
+  const resMatch = lower.match(/(\d{3,4})x(\d{3,4})/);
+  if (resMatch) {
+    const h = parseInt(resMatch[2]);
+    if (h >= 1000) score += 3;
+    else if (h >= 500) score += 2;
+  }
+
+  if (/(original|large|hires)/.test(lower)) score += 2;
+
+  if (/(thumb|small|icon|logo|avatar|sprite|banner)/.test(lower)) score -= 4;
+
+  return score;
+}
+
+function buildPosterObjects(urls) {
+  return urls.map((url) => {
+    const score = posterScore(url);
+    return {
+      url,
+      score,
+      confidence: Math.min(100, 50 + score * 10),
+    };
+  });
 }
 
 function sortAndLimit(urls, limit = 5) {
-  return dedupePosterUrls(urls)
-    .filter((url) => isPosterImageUrl(url))
-    .sort((a, b) => posterScore(b) - posterScore(a))
+  const valid = dedupePosterUrls(urls).filter(looksLikeCleanImageUrl);
+
+  return buildPosterObjects(valid)
+    .sort((a, b) => b.score - a.score)
     .slice(0, limit);
 }
+
+/* -----------------------------
+   UTIL
+----------------------------- */
+
+function normalizeYear(value) {
+  if (!value) return null;
+  const y = parseInt(value, 10);
+  return y >= 1888 && y <= 3000 ? y : null;
+}
+
+/* -----------------------------
+   PROVIDERS
+----------------------------- */
 
 async function fetchFirecrawlPosterCandidates(movie, year) {
   const app = new FirecrawlApp({
     apiKey: process.env.FIRECRAWL_API_KEY,
   });
 
-  const searchQuery = year ? `${movie} ${year} movie poster` : `${movie} movie poster`;
-  const result = await app.search(searchQuery, {
+  const query = year
+    ? `${movie} ${year} movie poster`
+    : `${movie} movie poster`;
+
+  const result = await app.search(query, {
     limit: 8,
-    scrapeOptions: {
-      formats: ["links", "markdown"],
-    },
+    scrapeOptions: { formats: ["links", "markdown"] },
   });
 
   return sortAndLimit(extractImageCandidates(result));
 }
 
 async function fetchImdbPosterCandidates(movie, year) {
-  const trimmedMovie = typeof movie === "string" ? movie.trim() : "";
-  if (!trimmedMovie) return [];
+  const name = movie?.trim();
+  if (!name) return [];
 
-  const firstChar = trimmedMovie[0].toLowerCase();
-  const imdbUrl = `https://v3.sg.media-imdb.com/suggestion/${encodeURIComponent(firstChar)}/${encodeURIComponent(trimmedMovie)}.json`;
+  const url = `https://v3.sg.media-imdb.com/suggestion/${encodeURIComponent(
+    name[0].toLowerCase()
+  )}/${encodeURIComponent(name)}.json`;
 
-  const response = await fetch(imdbUrl);
-  if (!response.ok) return [];
+  const res = await fetch(url);
+  if (!res.ok) return [];
 
-  const payload = await response.json();
-  const allCandidates = (payload?.d || [])
-    .filter((item) => item?.id?.startsWith("tt"))
-    .filter((item) => year === null || item?.y === year)
-    .map((item) => item?.i?.imageUrl)
-    .filter((url) => typeof url === "string");
+  const data = await res.json();
 
-  const candidates = allCandidates.length
-    ? allCandidates
-    : (payload?.d || [])
-        .filter((item) => item?.id?.startsWith("tt"))
-        .map((item) => item?.i?.imageUrl)
-        .filter((url) => typeof url === "string");
+  const items = (data?.d || [])
+    .filter((x) => x?.id?.startsWith("tt"))
+    .filter((x) => (year ? x?.y === year : true))
+    .map((x) => x?.i?.imageUrl)
+    .filter(Boolean);
 
-  return sortAndLimit(candidates);
+  return sortAndLimit(items);
 }
 
 async function fetchItunesPosterCandidates(movie, year) {
-  const trimmedMovie = typeof movie === "string" ? movie.trim() : "";
-  if (!trimmedMovie) return [];
+  const name = movie?.trim();
+  if (!name) return [];
 
-  const query = encodeURIComponent(trimmedMovie);
-  const iTunesUrl = `https://itunes.apple.com/search?term=${query}&media=movie&entity=movie&limit=25`;
-  const response = await fetch(iTunesUrl);
-  if (!response.ok) return [];
+  const url = `https://itunes.apple.com/search?term=${encodeURIComponent(
+    name
+  )}&media=movie&limit=25`;
 
-  const payload = await response.json();
-  const results = Array.isArray(payload?.results) ? payload.results : [];
+  const res = await fetch(url);
+  if (!res.ok) return [];
 
-  const filtered = results.filter((item) => {
-    if (!item || typeof item !== "object") return false;
-    if (year === null) return true;
+  const data = await res.json();
 
-    const releaseDate = typeof item.releaseDate === "string" ? item.releaseDate : "";
-    const releaseYear = Number.parseInt(releaseDate.slice(0, 4), 10);
-    return Number.isInteger(releaseYear) && releaseYear === year;
-  });
+  const items = (data?.results || [])
+    .filter((x) => {
+      if (!year) return true;
+      const y = parseInt(x?.releaseDate?.slice(0, 4));
+      return y === year;
+    })
+    .map((x) =>
+      x?.artworkUrl100?.replace(
+        /\/\d+x\d+bb\.(jpg|jpeg)$/i,
+        "/1000x1000bb.$1"
+      )
+    )
+    .filter(Boolean);
 
-  const selected = filtered.length ? filtered : results;
-
-  const posters = selected
-    .map((item) => item?.artworkUrl100)
-    .filter((url) => typeof url === "string")
-    .map((url) => url.replace(/\/\d+x\d+bb\.(jpg|jpeg)$/i, "/1000x1000bb.$1"));
-
-  return sortAndLimit(posters);
+  return sortAndLimit(items);
 }
 
 async function fetchWikipediaPosterCandidates(movie, year) {
-  const trimmedMovie = typeof movie === "string" ? movie.trim() : "";
-  if (!trimmedMovie) return [];
+  const name = movie?.trim();
+  if (!name) return [];
 
-  const titleCandidates = [
-    year ? `${trimmedMovie} (${year} film)` : null,
-    `${trimmedMovie} (film)`,
-    trimmedMovie,
+  const attempts = [
+    year ? `${name} (${year} film)` : null,
+    `${name} (film)`,
+    name,
   ].filter(Boolean);
 
-  for (const candidate of titleCandidates) {
-    const wikiUrl = `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(candidate)}`;
-    const response = await fetch(wikiUrl);
-    if (!response.ok) continue;
+  for (const title of attempts) {
+    const url = `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(
+      title
+    )}`;
 
-    const payload = await response.json();
-    const images = [payload?.originalimage?.source, payload?.thumbnail?.source].filter(
-      (url) => typeof url === "string"
-    );
+    const res = await fetch(url);
+    if (!res.ok) continue;
+
+    const data = await res.json();
+
+    const images = [
+      data?.originalimage?.source,
+      data?.thumbnail?.source,
+    ].filter(Boolean);
 
     const posters = sortAndLimit(images);
-    if (posters.length) {
-      return posters;
-    }
+    if (posters.length) return posters;
   }
 
   return [];
 }
 
-async function findPostersWithFallback(movie, year) {
+/* -----------------------------
+   MAIN LOGIC
+----------------------------- */
+
+async function findPosters(movie, year) {
   const providers = [
-    { name: "firecrawl", fetcher: () => fetchFirecrawlPosterCandidates(movie, year) },
-    { name: "imdb", fetcher: () => fetchImdbPosterCandidates(movie, year) },
-    { name: "itunes", fetcher: () => fetchItunesPosterCandidates(movie, year) },
-    { name: "wikipedia", fetcher: () => fetchWikipediaPosterCandidates(movie, year) },
+    { name: "firecrawl", fn: fetchFirecrawlPosterCandidates },
+    { name: "imdb", fn: fetchImdbPosterCandidates },
+    { name: "itunes", fn: fetchItunesPosterCandidates },
+    { name: "wikipedia", fn: fetchWikipediaPosterCandidates },
   ];
 
-  const sourcesTried = [];
-  for (const provider of providers) {
-    sourcesTried.push(provider.name);
+  const tried = [];
+
+  for (const p of providers) {
+    tried.push(p.name);
     try {
-      const posters = await provider.fetcher();
+      const posters = await p.fn(movie, year);
       if (posters.length) {
-        return {
-          posters,
-          source: provider.name,
-          sourcesTried,
-        };
+        return { posters, source: p.name, sourcesTried: tried };
       }
-    } catch {
-      // continue to next source
+    } catch (err) {
+      console.error(p.name, err);
     }
   }
 
-  return {
-    posters: [],
-    source: null,
-    sourcesTried,
-  };
+  return { posters: [], source: null, sourcesTried: tried };
 }
+
+/* -----------------------------
+   API HANDLER
+----------------------------- */
 
 export default async function handler(req, res) {
   try {
     const movie = req.query.movie || "inception";
     const year = normalizeYear(req.query.year);
 
-    const { posters, source, sourcesTried } = await findPostersWithFallback(movie, year);
+    const { posters, source, sourcesTried } = await findPosters(
+      movie,
+      year
+    );
 
     res.status(200).json({
       movie,
       year,
       posters,
+      bestPoster: posters[0]?.url || null,
       source,
       sourcesTried,
     });
