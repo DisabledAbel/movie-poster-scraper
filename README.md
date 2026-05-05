@@ -25,8 +25,8 @@ This project provides a **movie poster API** using **Firecrawl** to fetch poster
 
 ### 1) Clone the repository
 
-```bash
-git clone https://github.com/DisabledAbel/movie-poster-scraper
+```basħ
+https://github.com/DisabledAbel/movie-poster-scraper.git
 cd movie-poster-scraper
 ```
 
