@@ -110,13 +110,7 @@ Optionally, set `FIRECRAWL_API_KEY` to include Firecrawl as an additional source
 
 ## Deployment on Vercel
 
-1. Push your repository to GitHub:
-
-```bash
-git add .
-git commit -m "Initial Vercel deployment"
-git push
-```
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/DisabledAbel/movie-poster-scraper)
 
 2. Go to **Vercel Dashboard → New Project → Import GitHub Repository**
 3. Set environment variables in **Vercel Settings → Environment Variables**:
