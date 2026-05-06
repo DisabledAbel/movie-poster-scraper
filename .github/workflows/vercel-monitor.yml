@@ -1,0 +1,16 @@
+name: Vercel Deployment Failure Monitor
+
+on:
+  repository_dispatch:
+    types:
+      - vercel.deployment.failed
+
+jobs:
+  monitor:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Log Vercel deployment failure payload
+        run: |
+          echo "Deployment URL: ${{ github.event.client_payload.deployment_url || 'N/A' }}"
+          echo "Error payload:"
+          echo '${{ toJson(github.event.client_payload) }}'
