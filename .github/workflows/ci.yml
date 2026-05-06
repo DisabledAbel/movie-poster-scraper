@@ -39,21 +39,21 @@ jobs:
 
           test_endpoint() {
             local query="$1"
-            local base_url="http://127.0.0.1:3000/"
+            local url="http://127.0.0.1:3000/?q=${query}"
 
-            echo "Testing: ${base_url}?q=${query}"
+            echo "Testing: $url"
             local body_file
             body_file=$(mktemp)
 
             local status
-            status=$(curl --get --data-urlencode "q=${query}" --retry 3 --retry-all-errors --max-time 10 --silent --show-error --location --output "$body_file" --write-out "%{http_code}" "$base_url") || {
-              echo "curl failed for ${base_url}?q=${query}"
+            status=$(curl --retry 3 --retry-all-errors --max-time 10 --silent --show-error --location --output "$body_file" --write-out "%{http_code}" "$url") || {
+              echo "curl failed for $url"
               cat server.log || true
               exit 1
             }
 
             if [ "$status" != "200" ]; then
-              echo "Expected HTTP 200, got $status for ${base_url}?q=${query}"
+              echo "Expected HTTP 200, got $status for $url"
               echo "--- Response body ---"
               cat "$body_file"
               echo "--- Server logs ---"
@@ -62,14 +62,14 @@ jobs:
             fi
 
             if [ ! -s "$body_file" ]; then
-              echo "Empty response body for ${base_url}?q=${query}"
+              echo "Empty response body for $url"
               echo "--- Server logs ---"
               cat server.log || true
               exit 1
             fi
 
             if ! grep -Eiq 'https?://[^"[:space:]]+\.jpe?g([?][^"[:space:]]*)?' "$body_file"; then
-              echo "No JPG/JPEG image URL found in response for ${base_url}?q=${query}"
+              echo "No JPG/JPEG image URL found in response for $url"
               echo "--- Response body ---"
               cat "$body_file"
               echo "--- Server logs ---"
