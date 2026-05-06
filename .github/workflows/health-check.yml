@@ -1,0 +1,47 @@
+name: Health Check
+
+on:
+  schedule:
+    - cron: '*/10 * * * *'
+  workflow_dispatch:
+
+jobs:
+  health-check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Check deployed API health
+        run: |
+          set -euo pipefail
+          URL="https://movie-poster-scraper.vercel.app/api/scrape?movie=Frozen"
+          BODY_FILE=$(mktemp)
+
+          STATUS=$(curl --retry 3 --retry-all-errors --max-time 10 --silent --show-error --location --output "$BODY_FILE" --write-out "%{http_code}" "$URL") || {
+            echo "API DOWN"
+            exit 1
+          }
+
+          if [ "$STATUS" != "200" ]; then
+            echo "API DOWN"
+            echo "HTTP status: $STATUS"
+            echo "Body:"
+            cat "$BODY_FILE"
+            exit 1
+          fi
+
+          if [ ! -s "$BODY_FILE" ]; then
+            echo "API DOWN"
+            echo "Empty response body"
+            exit 1
+          fi
+
+          if ! grep -Eiq 'https?://[^"[:space:]]+\.(jpg|jpeg|png|webp)([?][^"[:space:]]*)?' "$BODY_FILE"; then
+            echo "API DOWN"
+            echo "No poster image URL found in API response"
+            echo "Body:"
+            cat "$BODY_FILE"
+            exit 1
+          fi
+
+          echo "API healthy"
