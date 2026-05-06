@@ -87,6 +87,8 @@ function posterScore(url) {
   if (/(\d{3,4})x(\d{3,4})/.test(lower)) score += 2;
   if (/(vertical|large|original|hires|full)/.test(lower)) score += 1;
   if (/(thumb|small|icon|avatar|logo|sprite|banner)/.test(lower)) score -= 2;
+  if (lower.includes("image.tmdb.org")) score += 5;
+  if (lower.includes("/original/")) score += 3;
 
   return score;
 }
@@ -145,6 +147,73 @@ function sortAndLimit(urls, limit = 5) {
     .filter((url) => isPosterImageUrl(url))
     .sort((a, b) => posterScore(b) - posterScore(a))
     .slice(0, limit);
+}
+
+
+function buildTmdbImageUrl(path, size) {
+  if (typeof path !== "string") return "";
+  const trimmedPath = path.trim();
+  if (!trimmedPath || !trimmedPath.startsWith("/")) return "";
+  return `https://image.tmdb.org/t/p/${size}${trimmedPath}`;
+}
+
+function pickBestTmdbMatch(results, year) {
+  if (!Array.isArray(results) || !results.length) return null;
+  if (year === null) return results[0] || null;
+
+  const scored = results
+    .map((item) => {
+      const releaseDate = typeof item?.release_date === "string" ? item.release_date : "";
+      const releaseYear = Number.parseInt(releaseDate.slice(0, 4), 10);
+      const yearDistance = Number.isInteger(releaseYear) ? Math.abs(releaseYear - year) : Number.POSITIVE_INFINITY;
+      return { item, yearDistance };
+    })
+    .sort((a, b) => a.yearDistance - b.yearDistance);
+
+  return scored[0]?.item || results[0] || null;
+}
+
+async function fetchTmdbPosterCandidates(movie, year) {
+  const apiKey = process.env.TMDB_API_KEY;
+  const trimmedMovie = typeof movie === "string" ? movie.trim() : "";
+  if (!trimmedMovie || !apiKey) return [];
+
+  try {
+    // TMDB v3 search returns relative image paths (e.g. /abc123.jpg), so we must convert
+    // them into full image URLs using image.tmdb.org with specific sizes.
+    const searchParams = new URLSearchParams({
+      api_key: apiKey,
+      query: trimmedMovie,
+    });
+
+    if (year !== null) {
+      searchParams.set("year", String(year));
+    }
+
+    const tmdbSearchUrl = `https://api.themoviedb.org/3/search/movie?${searchParams.toString()}`;
+    const response = await fetch(tmdbSearchUrl);
+    if (!response.ok) return [];
+
+    const payload = await response.json();
+    const bestMatch = pickBestTmdbMatch(payload?.results || [], year);
+    if (!bestMatch) return [];
+
+    const imagePaths = [bestMatch?.poster_path, bestMatch?.backdrop_path]
+      .filter((path) => typeof path === "string" && path.trim().startsWith("/"));
+
+    if (!imagePaths.length) return [];
+
+    const candidates = [];
+    for (const path of imagePaths) {
+      candidates.push(buildTmdbImageUrl(path, "w500"));
+      candidates.push(buildTmdbImageUrl(path, "original"));
+    }
+
+    return sortAndLimit(candidates);
+  } catch {
+    // Fail silently and allow fallback providers to continue.
+    return [];
+  }
 }
 
 async function fetchFirecrawlPosterCandidates(movie, year) {
@@ -252,6 +321,9 @@ async function fetchWikipediaPosterCandidates(movie, year) {
 
 async function findPostersWithFallback(movie, year) {
   const providers = [
+    ...(process.env.TMDB_API_KEY
+      ? [{ name: "tmdb", fetcher: () => fetchTmdbPosterCandidates(movie, year) }]
+      : []),
     { name: "firecrawl", fetcher: () => fetchFirecrawlPosterCandidates(movie, year) },
     { name: "imdb", fetcher: () => fetchImdbPosterCandidates(movie, year) },
     { name: "itunes", fetcher: () => fetchItunesPosterCandidates(movie, year) },
