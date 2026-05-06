@@ -1,4 +1,4 @@
-name: Health Check run
+name: Health Check
 
 on:
   schedule:
