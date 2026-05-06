@@ -38,7 +38,7 @@ jobs:
             local encoded_query
             encoded_query=$(python3 -c "import urllib.parse, sys; print(urllib.parse.quote(sys.argv[1]))" "$query")
 
-            local url="https://movie-poster-scraper.vercel.app/api?query=$encoded_query"
+            local url="https://movie-poster-scraper.vercel.app/api/search?query=$encoded_query"
 
             echo "Testing: $url"
 
@@ -72,7 +72,7 @@ jobs:
               exit 1
             fi
 
-            if ! grep -Eiq 'https?://[^"[:space:]]+\.(jpe?g|png|webp)(\?[^"[:space:]]*)?' "$body_file"; then
+            if ! grep -Eiq 'https?://[^"[:space:]]+\.(jpe?g|png|webp|avif)(\?[^"[:space:]]*)?' "$body_file"; then
               echo "No image URL found in response for $url"
               echo "--- Response body ---"
               cat "$body_file"
