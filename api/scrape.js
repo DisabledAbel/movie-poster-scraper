@@ -153,8 +153,10 @@ function sortAndLimit(urls, limit = 5) {
 function buildTmdbImageUrl(path, size) {
   if (typeof path !== "string") return "";
   const trimmedPath = path.trim();
-  if (!trimmedPath || !trimmedPath.startsWith("/")) return "";
-  return `https://image.tmdb.org/t/p/${size}${trimmedPath}`;
+  if (!trimmedPath) return "";
+
+  const normalizedPath = trimmedPath.startsWith("/") ? trimmedPath : `/${trimmedPath}`;
+  return `https://image.tmdb.org/t/p/${size}${normalizedPath}`;
 }
 
 function pickBestTmdbMatch(results, year) {
@@ -194,19 +196,22 @@ async function fetchTmdbPosterCandidates(movie, year) {
     const response = await fetch(tmdbSearchUrl);
     if (!response.ok) return [];
 
-    const payload = await response.json();
-    const bestMatch = pickBestTmdbMatch(payload?.results || [], year);
+    const payload = await response.json().catch(() => null);
+    const results = Array.isArray(payload?.results) ? payload.results : [];
+    const bestMatch = pickBestTmdbMatch(results, year);
     if (!bestMatch) return [];
 
-    const imagePaths = [bestMatch?.poster_path, bestMatch?.backdrop_path]
-      .filter((path) => typeof path === "string" && path.trim().startsWith("/"));
-
-    if (!imagePaths.length) return [];
+    const prioritizedMatches = [bestMatch, ...results.filter((item) => item !== bestMatch)].slice(0, 3);
 
     const candidates = [];
-    for (const path of imagePaths) {
-      candidates.push(buildTmdbImageUrl(path, "w500"));
-      candidates.push(buildTmdbImageUrl(path, "original"));
+    for (const match of prioritizedMatches) {
+      const imagePaths = [match?.poster_path, match?.backdrop_path]
+        .filter((path) => typeof path === "string" && path.trim());
+
+      for (const path of imagePaths) {
+        candidates.push(buildTmdbImageUrl(path, "w500"));
+        candidates.push(buildTmdbImageUrl(path, "original"));
+      }
     }
 
     return sortAndLimit(candidates);
