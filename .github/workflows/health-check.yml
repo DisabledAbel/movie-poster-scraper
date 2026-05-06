@@ -14,7 +14,7 @@ jobs:
       - name: Check deployed API health
         run: |
           set -euo pipefail
-          URL="https://movie-poster-scraper.vercel.app/?q=Frozen"
+          URL="https://movie-poster-scraper.vercel.app/api/search?query=Frozen"
           BODY_FILE=$(mktemp)
 
           STATUS=$(curl --retry 3 --retry-all-errors --max-time 10 --silent --show-error --location --output "$BODY_FILE" --write-out "%{http_code}" "$URL") || {
@@ -36,9 +36,9 @@ jobs:
             exit 1
           fi
 
-          if ! grep -Eiq 'https?://[^"[:space:]]+\.jpe?g([?][^"[:space:]]*)?' "$BODY_FILE"; then
+          if ! grep -Eiq 'https?://[^"[:space:]]+\.(jpe?g|png|webp|avif)([?][^"[:space:]]*)?' "$BODY_FILE"; then
             echo "API DOWN"
-            echo "No JPG/JPEG image URL found"
+            echo "No image URL found"
             echo "Body:"
             cat "$BODY_FILE"
             exit 1
