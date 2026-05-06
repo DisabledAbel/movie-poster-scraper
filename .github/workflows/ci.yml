@@ -1,0 +1,95 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Run lint if available
+        run: npm run lint || true
+
+      - name: Run build if available
+        run: npm run build || true
+
+      - name: Start local server
+        run: |
+          node index.js > server.log 2>&1 &
+          echo $! > server.pid
+          sleep 5
+
+      - name: Test local API endpoints
+        run: |
+          set -euo pipefail
+
+          test_endpoint() {
+            local query="$1"
+            local base_url="http://127.0.0.1:3000/"
+
+            echo "Testing: ${base_url}?q=${query}"
+            local body_file
+            body_file=$(mktemp)
+
+            local status
+            status=$(curl --get --data-urlencode "q=${query}" --retry 3 --retry-all-errors --max-time 10 --silent --show-error --location --output "$body_file" --write-out "%{http_code}" "$base_url") || {
+              echo "curl failed for ${base_url}?q=${query}"
+              cat server.log || true
+              exit 1
+            }
+
+            if [ "$status" != "200" ]; then
+              echo "Expected HTTP 200, got $status for ${base_url}?q=${query}"
+              echo "--- Response body ---"
+              cat "$body_file"
+              echo "--- Server logs ---"
+              cat server.log || true
+              exit 1
+            fi
+
+            if [ ! -s "$body_file" ]; then
+              echo "Empty response body for ${base_url}?q=${query}"
+              echo "--- Server logs ---"
+              cat server.log || true
+              exit 1
+            fi
+
+            if ! grep -Eiq 'https?://[^"[:space:]]+\.jpe?g([?][^"[:space:]]*)?' "$body_file"; then
+              echo "No JPG/JPEG image URL found in response for ${base_url}?q=${query}"
+              echo "--- Response body ---"
+              cat "$body_file"
+              echo "--- Server logs ---"
+              cat server.log || true
+              exit 1
+            fi
+          }
+
+          test_endpoint "Frozen"
+          test_endpoint "Tangled"
+          test_endpoint "8 Mile"
+          test_endpoint "Beauty and the Beast"
+
+      - name: Show logs on failure
+        if: failure()
+        run: cat server.log || true
+
+      - name: Stop local server
+        if: always()
+        run: |
+          if [ -f server.pid ]; then
+            kill "$(cat server.pid)" || true
+          fi
