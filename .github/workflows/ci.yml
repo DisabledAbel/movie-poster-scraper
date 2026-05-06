@@ -39,7 +39,7 @@ jobs:
 
           test_endpoint() {
             local query="$1"
-            local url="http://127.0.0.1:3000/?q=${query}"
+            local url="https://movie-poster-scraper.vercel.app
 
             echo "Testing: $url"
             local body_file
