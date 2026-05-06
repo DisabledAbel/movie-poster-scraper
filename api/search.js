@@ -3,23 +3,6 @@ function toYear(value) {
   return Number.isInteger(parsed) ? parsed : null;
 }
 
-
-function parseQueryAndYear(rawQuery, rawYear) {
-  const cleanQuery = typeof rawQuery === "string" ? rawQuery.trim() : "";
-  const explicitYear = toYear(rawYear);
-  if (!cleanQuery) return { query: "", year: explicitYear };
-
-  const match = cleanQuery.match(/^(.*)\((\d{4})\)\s*$/);
-  if (!match) return { query: cleanQuery, year: explicitYear };
-
-  const titleOnly = match[1].trim();
-  const parsedYear = toYear(match[2]);
-  return {
-    query: titleOnly || cleanQuery,
-    year: explicitYear ?? parsedYear,
-  };
-}
-
 function buildTmdbPosterUrl(posterPath) {
   const raw = typeof posterPath === "string" ? posterPath.trim() : "";
   if (!raw) return "";
@@ -105,9 +88,8 @@ export default async function handler(req, res) {
       return res.status(405).json({ error: "Method Not Allowed" });
     }
 
-    const parsed = parseQueryAndYear(req.query?.query, req.query?.year);
-    const query = parsed.query;
-    const year = parsed.year;
+    const query = typeof req.query?.query === "string" ? req.query.query.trim() : "";
+    const year = toYear(req.query?.year);
 
     if (!query) {
       return res.status(400).json({ error: "Missing query parameter: query" });

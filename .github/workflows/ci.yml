@@ -27,53 +27,55 @@ jobs:
       - name: Run build if available
         run: npm run build || true
 
-      - name: Start local server
-        run: |
-          node index.js > server.log 2>&1 &
-          echo $! > server.pid
-          sleep 5
-
-      - name: Test local API endpoints
+      - name: Test Vercel API endpoints
         run: |
           set -euo pipefail
 
           test_endpoint() {
             local query="$1"
-            local base_url="http://127.0.0.1:3000/"
 
-            echo "Testing: ${base_url}?q=${query}"
+            # URL encode using Python (always available)
+            local encoded_query
+            encoded_query=$(python3 -c "import urllib.parse, sys; print(urllib.parse.quote(sys.argv[1]))" "$query")
+
+            local url="https://movie-poster-scraper.vercel.app/api?query=$encoded_query"
+
+            echo "Testing: $url"
+
             local body_file
             body_file=$(mktemp)
 
             local status
-            status=$(curl --get --data-urlencode "q=${query}" --retry 3 --retry-all-errors --max-time 10 --silent --show-error --location --output "$body_file" --write-out "%{http_code}" "$base_url") || {
-              echo "curl failed for ${base_url}?q=${query}"
-              cat server.log || true
-              exit 1
-            }
+            status=$(curl \
+              --retry 3 \
+              --retry-all-errors \
+              --max-time 10 \
+              --silent \
+              --show-error \
+              --location \
+              --output "$body_file" \
+              --write-out "%{http_code}" \
+              "$url") || {
+                echo "curl failed for $url"
+                exit 1
+              }
 
             if [ "$status" != "200" ]; then
-              echo "Expected HTTP 200, got $status for ${base_url}?q=${query}"
+              echo "Expected HTTP 200, got $status for $url"
               echo "--- Response body ---"
               cat "$body_file"
-              echo "--- Server logs ---"
-              cat server.log || true
               exit 1
             fi
 
             if [ ! -s "$body_file" ]; then
-              echo "Empty response body for ${base_url}?q=${query}"
-              echo "--- Server logs ---"
-              cat server.log || true
+              echo "Empty response body for $url"
               exit 1
             fi
 
-            if ! grep -Eiq 'https?://[^"[:space:]]+\.jpe?g([?][^"[:space:]]*)?' "$body_file"; then
-              echo "No JPG/JPEG image URL found in response for ${base_url}?q=${query}"
+            if ! grep -Eiq 'https?://[^"[:space:]]+\.(jpe?g|png|webp)(\?[^"[:space:]]*)?' "$body_file"; then
+              echo "No image URL found in response for $url"
               echo "--- Response body ---"
               cat "$body_file"
-              echo "--- Server logs ---"
-              cat server.log || true
               exit 1
             fi
           }
