@@ -47,7 +47,14 @@
         }
 
         const response = await fetch(`/api/scrape?${params.toString()}`);
-        const payload = await response.json();
+
+        let payload;
+        try {
+          payload = await response.json();
+        } catch (parseErr) {
+          const responseText = await response.text().catch(() => "");
+          throw new Error(`Server returned invalid response: ${responseText.slice(0, 100)}`);
+        }
 
         if (!response.ok) {
           throw new Error(payload?.error || "Could not fetch posters from the server.");
