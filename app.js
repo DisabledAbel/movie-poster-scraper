@@ -50,10 +50,9 @@
 
         let payload;
         try {
-          payload = await response.json();
+          payload = JSON.parse(await response.text());
         } catch (parseErr) {
-          const responseText = await response.text().catch(() => "");
-          throw new Error(`Server returned invalid response: ${responseText.slice(0, 100)}`);
+          throw new Error(`Server returned invalid response: check server logs`);
         }
 
         if (!response.ok) {
