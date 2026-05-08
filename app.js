@@ -42,7 +42,7 @@
         if (!movie) throw new Error("A movie title is required.");
 
         const params = new URLSearchParams({ movie });
-        if (/^\d{4}$/.test(year)) {
+        if (year && /^\d{4}$/.test(year)) {
           params.set("year", year);
         }
 
