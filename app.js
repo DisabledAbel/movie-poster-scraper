@@ -59,7 +59,10 @@
           throw new Error(payload?.error || "Could not fetch posters from the server.");
         }
 
-        return Array.isArray(payload?.posters) ? payload.posters : [];
+        return {
+          posters: Array.isArray(payload?.posters) ? payload.posters : [],
+          leadCharacter: payload?.leadCharacter || null,
+        };
       }
 
       function rankAndLimitLocalSuggestions(query) {
@@ -184,8 +187,26 @@
         suggestionsEl.hidden = false;
       }
 
-      function renderPosterResults(posters) {
+      function renderPosterResults(posters, leadCharacter) {
         resultsEl.innerHTML = "";
+
+        // Add lead character info if available
+        if (leadCharacter && (leadCharacter.character || leadCharacter.actor)) {
+          const leadEl = document.createElement("li");
+          leadEl.className = "lead-character";
+          leadEl.style.cssText = "margin-bottom: 14px; padding: 10px 12px; background: rgba(30, 41, 59, 0.8); border-radius: 8px; border: 1px solid #334155;";
+          
+          let leadText = "Lead: ";
+          if (leadCharacter.character && leadCharacter.actor) {
+            leadText += `${leadCharacter.character} (${leadCharacter.actor})`;
+          } else if (leadCharacter.character) {
+            leadText += leadCharacter.character;
+          } else if (leadCharacter.actor) {
+            leadText += leadCharacter.actor;
+          }
+          leadEl.textContent = leadText;
+          resultsEl.appendChild(leadEl);
+        }
 
         posters.forEach((url, index) => {
           const li = document.createElement("li");
@@ -254,14 +275,14 @@
         searchBtn.disabled = true;
 
         try {
-          const posters = await getMoviePosters(title);
+          const { posters, leadCharacter } = await getMoviePosters(title);
           if (!posters.length) {
             statusEl.textContent = "No JPG/JPEG poster URLs found.";
             return;
           }
 
           statusEl.textContent = `Found ${posters.length} poster URL(s):`;
-          renderPosterResults(posters);
+          renderPosterResults(posters, leadCharacter);
         } catch (err) {
           statusEl.className = "status error";
           statusEl.textContent = err.message;
