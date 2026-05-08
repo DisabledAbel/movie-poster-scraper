@@ -191,18 +191,25 @@
         resultsEl.innerHTML = "";
 
         // Add lead character info if available
-        if (leadCharacter && (leadCharacter.character || leadCharacter.actor)) {
+        if (leadCharacter && (leadCharacter.character || leadCharacter.actor || leadCharacter.year || leadCharacter.type)) {
           const leadEl = document.createElement("li");
           leadEl.className = "lead-character";
           leadEl.style.cssText = "margin-bottom: 14px; padding: 10px 12px; background: rgba(30, 41, 59, 0.8); border-radius: 8px; border: 1px solid #334155;";
           
-          let leadText = "Lead: ";
+          let leadText = "";
+          // TMDB format: "Lead: Character (Actor)"
           if (leadCharacter.character && leadCharacter.actor) {
-            leadText += `${leadCharacter.character} (${leadCharacter.actor})`;
+            leadText = `Lead: ${leadCharacter.character} (${leadCharacter.actor})`;
           } else if (leadCharacter.character) {
-            leadText += leadCharacter.character;
+            leadText = `Lead: ${leadCharacter.character}`;
           } else if (leadCharacter.actor) {
-            leadText += leadCharacter.actor;
+            leadText = `Lead: ${leadCharacter.actor}`;
+          } else if (leadCharacter.year || leadCharacter.type) {
+            // IMDB fallback format: "Year: 2010 | Type: Movie"
+            const parts = [];
+            if (leadCharacter.year) parts.push(`Year: ${leadCharacter.year}`);
+            if (leadCharacter.type) parts.push(`Type: ${leadCharacter.type}`);
+            leadText = parts.join(" | ");
           }
           leadEl.textContent = leadText;
           resultsEl.appendChild(leadEl);

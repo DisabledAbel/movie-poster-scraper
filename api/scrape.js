@@ -1,5 +1,5 @@
 import { normalizeYear } from "../lib/poster-utils.js";
-import { findPostersSequential, fetchTmdbLeadCharacter } from "../lib/providers.js";
+import { findPostersSequential, fetchTmdbLeadCharacter, fetchImdbLeadCharacter } from "../lib/providers.js";
 
 export default async function handler(req, res) {
   try {
@@ -8,10 +8,13 @@ export default async function handler(req, res) {
 
     const { posters, source, sourcesTried } = await findPostersSequential(movie, year);
     
-    // Fetch lead character info if TMDB is available
+    // Try TMDB first (requires API key), then fallback to IMDB
     let leadCharacter = null;
     if (process.env.TMDB_API_KEY) {
       leadCharacter = await fetchTmdbLeadCharacter(movie, year);
+    }
+    if (!leadCharacter) {
+      leadCharacter = await fetchImdbLeadCharacter(movie, year);
     }
 
     res.status(200).json({
