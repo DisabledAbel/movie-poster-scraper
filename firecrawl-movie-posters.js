@@ -22,7 +22,7 @@ import {
 } from "./lib/providers.js";
 
 /**
- * Search providers for movie posters and return top 5 JPG URLs.
+ * Search providers for movie posters and return the top 15 JPG URLs.
  * Firecrawl is optional and used only when FIRECRAWL_API_KEY is set.
  * @param {string} title
  * @returns {Promise<string[]>}
