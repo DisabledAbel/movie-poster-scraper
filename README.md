@@ -201,12 +201,6 @@ GET /api/poster-img/inception.jpg
 
 **Behavior:** Redirects to the poster image URL. Plex or apps can fetch directly.
 
----
-
-## Caching
-
-* Cached posters are stored in `.cache/` locally.
-* On Vercel, consider using **Vercel KV** or **Edge Config** for persistent caching.
 
 ---
 
