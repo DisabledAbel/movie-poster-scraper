@@ -16,6 +16,7 @@
       let pendingRemoteTimer;
 
       const titleInput = document.getElementById("title");
+      const limitInput = document.getElementById("limit");
       const searchBtn = document.getElementById("searchBtn");
       const statusEl = document.getElementById("status");
       const resultsEl = document.getElementById("results");
@@ -45,6 +46,8 @@
         if (year && /^\d{4}$/.test(year)) {
           params.set("year", year);
         }
+        const limit = Math.min(50, Math.max(5, parseInt(limitInput?.value) || 15));
+        params.set("limit", limit);
 
         const response = await fetch(`/api/scrape?${params.toString()}`);
 

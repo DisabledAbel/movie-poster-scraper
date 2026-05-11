@@ -5,8 +5,9 @@ export default async function handler(req, res) {
   try {
     const movie = req.query.movie || "inception";
     const year = normalizeYear(req.query.year);
+    const limit = Math.min(50, Math.max(5, parseInt(req.query.limit) || 15));
 
-    const { posters, source, sourcesTried } = await findPostersSequential(movie, year);
+    const { posters, source, sourcesTried } = await findPostersSequential(movie, year, { limit });
 
     res.status(200).json({
       movie,

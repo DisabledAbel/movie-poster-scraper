@@ -135,7 +135,10 @@
           <input id="title" type="text" placeholder="The Thing (1982)" autocomplete="off" />
           <ul id="suggestions" class="suggestions" hidden></ul>
         </div>
-
+        <div>
+          <label for="limit">Number of Posters (5-50)</label>
+          <input id="limit" type="number" min="5" max="50" value="15" />
+        </div>
 
         <button id="searchBtn" type="submit">Find Top 15 Posters</button>
         <div id="status" class="status"></div>
