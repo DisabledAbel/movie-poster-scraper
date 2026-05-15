@@ -30,7 +30,7 @@ https://github.com/DisabledAbel/movie-poster-scraper.git
 ```
 then:
 ```bash
-cd movie-poster-scrape
+cd movie-poster-scraper
 ```
 
 ### 2) Install dependencies
