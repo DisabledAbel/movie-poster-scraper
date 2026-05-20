@@ -8,7 +8,9 @@
   "scripts": {
     "dev": "vercel dev --listen 3000",
     "dev:linux": "bash ./scripts/run-local.sh",
-    "dev:windows": "powershell -ExecutionPolicy Bypass -File ./scripts/run-local.ps1"
+    "dev:windows": "powershell -ExecutionPolicy Bypass -File ./scripts/run-local.ps1",
+    "fetch:games": "node scripts/fetch-upcoming-games.js",
+    "backup:af1": "node save.json/backup-af1.js"
   },
   "devDependencies": {
     "vercel": "^39.1.0"
