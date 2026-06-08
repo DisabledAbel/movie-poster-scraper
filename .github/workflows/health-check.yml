@@ -9,6 +9,8 @@ jobs:
   health-check:
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    permissions:
+      issues: write
 
     steps:
       - name: Check deployed API health
@@ -16,32 +18,67 @@ jobs:
           set -euo pipefail
           URL="https://movie-poster-scraper.vercel.app/api/search?query=Frozen"
           BODY_FILE=$(mktemp)
+          FAILURE_FILE="/tmp/health_check_failure.log"
 
           STATUS=$(curl --retry 3 --retry-all-errors --max-time 10 --silent --show-error --location --output "$BODY_FILE" --write-out "%{http_code}" "$URL") || {
-            echo "API DOWN"
+            echo "API DOWN: Curl command failed" > "$FAILURE_FILE"
             exit 1
           }
 
           if [ "$STATUS" != "200" ]; then
-            echo "API DOWN"
-            echo "HTTP status: $STATUS"
-            echo "Body:"
-            cat "$BODY_FILE"
+            {
+              echo "### Health Check Failure"
+              echo "**Status:** $STATUS"
+              echo "**URL:** $URL"
+              echo "**Response Body:**"
+              echo '```json'
+              cat "$BODY_FILE"
+              echo '```'
+            } > "$FAILURE_FILE"
             exit 1
           fi
 
           if [ ! -s "$BODY_FILE" ]; then
-            echo "API DOWN"
-            echo "Empty response body"
+            {
+              echo "### Health Check Failure"
+              echo "**Error:** Empty response body"
+              echo "**URL:** $URL"
+            } > "$FAILURE_FILE"
             exit 1
           fi
 
           if ! grep -Eiq 'https?://[^"[:space:]]+\.(jpe?g|png|webp|avif)([?][^"[:space:]]*)?' "$BODY_FILE"; then
-            echo "API DOWN"
-            echo "No image URL found"
-            echo "Body:"
-            cat "$BODY_FILE"
+            {
+              echo "### Health Check Failure"
+              echo "**Error:** No image URL found in response"
+              echo "**URL:** $URL"
+              echo "**Response Body:**"
+              echo '```json'
+              cat "$BODY_FILE"
+              echo '```'
+            } > "$FAILURE_FILE"
             exit 1
           fi
 
           echo "API healthy"
+
+      - name: Create Issue on Failure
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          ISSUE_TITLE="Health Check Failure: No posters returned"
+          FAILURE_LOG="/tmp/health_check_failure.log"
+
+          # Check if an open issue with the same title already exists
+          EXISTING_ISSUE=$(gh issue list --state open --search "in:title \"$ISSUE_TITLE\"" --json number --jq '.[0].number')
+
+          if [ -z "$EXISTING_ISSUE" ]; then
+            if [ -f "$FAILURE_LOG" ]; then
+              gh issue create --title "$ISSUE_TITLE" --body-file "$FAILURE_LOG"
+            else
+              gh issue create --title "$ISSUE_TITLE" --body "Health check failed, but no detailed log was found."
+            fi
+          else
+            echo "Issue already exists: #$EXISTING_ISSUE"
+          fi
