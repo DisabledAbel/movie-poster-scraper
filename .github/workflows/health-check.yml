@@ -9,39 +9,69 @@ jobs:
   health-check:
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    permissions:
+      issues: write
 
     steps:
       - name: Check deployed API health
+        id: check
+        continue-on-error: true
         run: |
-          set -euo pipefail
+          set -uo pipefail
           URL="https://movie-poster-scraper.vercel.app/api/search?query=Frozen"
-          BODY_FILE=$(mktemp)
+          BODY_FILE="response_body.json"
 
           STATUS=$(curl --retry 3 --retry-all-errors --max-time 10 --silent --show-error --location --output "$BODY_FILE" --write-out "%{http_code}" "$URL") || {
-            echo "API DOWN"
+            echo "API DOWN: Curl failed" > error_reason.txt
             exit 1
           }
 
           if [ "$STATUS" != "200" ]; then
-            echo "API DOWN"
-            echo "HTTP status: $STATUS"
-            echo "Body:"
-            cat "$BODY_FILE"
+            echo "API DOWN: HTTP status $STATUS" > error_reason.txt
             exit 1
           fi
 
           if [ ! -s "$BODY_FILE" ]; then
-            echo "API DOWN"
-            echo "Empty response body"
+            echo "API DOWN: Empty response body" > error_reason.txt
             exit 1
           fi
 
           if ! grep -Eiq 'https?://[^"[:space:]]+\.(jpe?g|png|webp|avif)([?][^"[:space:]]*)?' "$BODY_FILE"; then
-            echo "API DOWN"
-            echo "No image URL found"
-            echo "Body:"
-            cat "$BODY_FILE"
+            echo "API DOWN: No image URL found" > error_reason.txt
             exit 1
           fi
 
           echo "API healthy"
+
+      - name: Create Issue on Failure
+        if: steps.check.outcome == 'failure'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TITLE="Health Check Failed: No Posters Found"
+          REASON=$(cat error_reason.txt 2>/dev/null || echo "Unknown reason")
+          BODY_CONTENT=$(cat response_body.json 2>/dev/null || echo "No response body")
+
+          # Check for existing open issues with the same title
+          EXISTING_ISSUE=$(curl -s -H "Authorization: token $GITHUB_TOKEN" \
+            "https://api.github.com/repos/${{ github.repository }}/issues?state=open" | \
+            jq -r ".[] | select(.title == \"$TITLE\") | .number" | head -n 1)
+
+          if [ -z "$EXISTING_ISSUE" ]; then
+            echo "Creating new issue..."
+            ISSUE_BODY=$(printf "Health check failed for movie posters.\n\n**Reason:** %s\n\n**Response Body:**\n\`\`\`json\n%s\n\`\`\`" "$REASON" "$BODY_CONTENT")
+
+            # Using jq to safely escape the body
+            JSON_PAYLOAD=$(jq -n --arg title "$TITLE" --arg body "$ISSUE_BODY" '{title: $title, body: $body}')
+
+            curl -s -X POST -H "Authorization: token $GITHUB_TOKEN" \
+              -H "Content-Type: application/json" \
+              -d "$JSON_PAYLOAD" \
+              "https://api.github.com/repos/${{ github.repository }}/issues"
+          else
+            echo "Issue already exists: #$EXISTING_ISSUE. Skipping creation."
+          fi
+
+      - name: Fail Workflow
+        if: steps.check.outcome == 'failure'
+        run: exit 1
