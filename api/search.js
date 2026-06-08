@@ -1,5 +1,5 @@
 import { normalizeYear } from "../lib/poster-utils.js";
-import { fetchTmdbSinglePoster, fetchImdbSinglePoster } from "../lib/providers.js";
+import { findPostersSequential } from "../lib/providers.js";
 
 export default async function handler(req, res) {
   try {
@@ -14,18 +14,20 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: "Missing query parameter: query" });
     }
 
-    const tmdb = await fetchTmdbSinglePoster(query, year);
-    if (tmdb) {
-      return res.status(200).json({ query, image: tmdb.image, source: tmdb.source });
-    }
+    const { posters, source, sourcesTried } = await findPostersSequential(query, year);
 
-    const imdb = await fetchImdbSinglePoster(query, year);
-    if (imdb) {
-      return res.status(200).json({ query, image: imdb.image, source: imdb.source });
+    if (posters && posters.length > 0) {
+      return res.status(200).json({
+        query,
+        posters,
+        image: posters[0], // backward compatibility
+        source,
+        sourcesTried
+      });
     }
 
     return res.status(404).json({ query, error: "No image found" });
-  } catch {
-    return res.status(500).json({ error: "Internal server error" });
+  } catch (err) {
+    return res.status(500).json({ error: err.message || "Internal server error" });
   }
 }
