@@ -131,6 +131,7 @@ Value: your Firecrawl API key.
 https://your-project-name.vercel.app/api/scrape
 https://your-project-name.vercel.app/api/poster/{movie-title}
 https://your-project-name.vercel.app/api/poster-img/{movie-title}.jpg
+https://your-project-name.vercel.app/latest-poster.jpg
 ```
 
 ---
@@ -200,6 +201,16 @@ GET /api/poster-img/inception.jpg
 ```
 
 **Behavior:** Redirects to the poster image URL. Plex or apps can fetch directly.
+
+### 4. `/latest-poster.jpg`
+
+Returns the **most recently searched poster image** as a direct URL:
+
+```text
+GET /latest-poster.jpg
+```
+
+**Behavior:** Redirects to the last successfully searched movie poster. Useful for dynamic displays or automated updates without specifying a title.
 
 ---
 
