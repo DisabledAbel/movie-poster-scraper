@@ -61,6 +61,57 @@
       .error { color: var(--danger); }
       ul { margin: 12px 0 0; padding-left: 18px; }
 
+      .latest-container {
+        margin-top: 24px;
+        padding-top: 16px;
+        border-top: 1px solid rgba(148, 163, 184, 0.2);
+        display: none;
+      }
+      .latest-container h2 {
+        font-size: 1rem;
+        color: var(--muted);
+        margin: 0 0 12px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .latest-container h2::before {
+        content: "";
+        display: inline-block;
+        width: 8px;
+        height: 8px;
+        background: var(--accent);
+        border-radius: 50%;
+      }
+      .latest-card {
+        display: flex;
+        gap: 16px;
+        background: rgba(15, 23, 42, 0.5);
+        padding: 12px;
+        border-radius: 10px;
+        border: 1px solid rgba(51, 65, 85, 0.5);
+      }
+      .latest-thumb {
+        width: 60px;
+        height: 90px;
+        object-fit: cover;
+        border-radius: 6px;
+        background: #020617;
+      }
+      .latest-info {
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+      }
+      .latest-title {
+        font-weight: 600;
+        margin-bottom: 4px;
+      }
+      .latest-link {
+        font-size: 0.85rem;
+        color: var(--muted);
+      }
+
       #results {
         list-style: none;
         padding: 0;
@@ -141,6 +192,17 @@
         <div id="status" class="status"></div>
         <ul id="results"></ul>
       </form>
+
+      <div id="latestContainer" class="latest-container">
+        <h2>Latest Search</h2>
+        <div class="latest-card">
+          <img id="latestThumb" class="latest-thumb" alt="Latest poster" />
+          <div class="latest-info">
+            <div id="latestTitle" class="latest-title"></div>
+            <a id="latestLink" href="/latest-poster.jpg" target="_blank" class="latest-link">/latest-poster.jpg</a>
+          </div>
+        </div>
+      </div>
     </main>
     <script src="/app.js"></script>
   </body>

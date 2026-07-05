@@ -21,6 +21,9 @@
       const resultsEl = document.getElementById("results");
       const suggestionsEl = document.getElementById("suggestions");
       const searchForm = document.getElementById("searchForm");
+      const latestContainer = document.getElementById("latestContainer");
+      const latestThumb = document.getElementById("latestThumb");
+      const latestTitle = document.getElementById("latestTitle");
 
       function splitTitleAndYear(value) {
         const raw = typeof value === "string" ? value.trim() : "";
@@ -245,6 +248,21 @@
         renderSuggestions(mergedSuggestions);
       }
 
+      async function fetchLatestPoster() {
+        try {
+          const response = await fetch("/api/latest-poster?json=1");
+          if (!response.ok) return;
+          const data = await response.json();
+          if (data && data.url) {
+            latestThumb.src = data.url;
+            latestTitle.textContent = data.title;
+            latestContainer.style.display = "block";
+          }
+        } catch (err) {
+          console.error("Failed to fetch latest poster", err);
+        }
+      }
+
       async function runSearch() {
         const title = titleInput.value.trim();
         hideSuggestions();
@@ -262,6 +280,7 @@
 
           statusEl.textContent = `Found ${posters.length} poster URL(s):`;
           renderPosterResults(posters);
+          await fetchLatestPoster();
         } catch (err) {
           statusEl.className = "status error";
           statusEl.textContent = err.message;
@@ -311,3 +330,6 @@
         event.preventDefault();
         runSearch();
       });
+
+      // Load latest poster on page load
+      fetchLatestPoster();
