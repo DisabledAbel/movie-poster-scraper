@@ -1,4 +1,6 @@
 import http from "http";
+import fs from "fs";
+import path from "path";
 import scrapeHandler from "./api/scrape.js";
 import posterHandler from "./api/poster.js";
 import searchHandler from "./api/search.js";
@@ -48,9 +50,22 @@ const server = http.createServer(async (req, res) => {
 
     if (pathname === "/") {
       const movie = (requestUrl.searchParams.get("q") || "").trim();
-      if (!movie) return sendJson(res, 400, { error: "Missing q parameter" });
-      const year = requestUrl.searchParams.get("year") || undefined;
-      return await scrapeHandler({ query: { movie, year } }, resShim);
+      if (movie) {
+        const year = requestUrl.searchParams.get("year") || undefined;
+        return await scrapeHandler({ query: { movie, year } }, resShim);
+      }
+
+      // Serve index.html for the root path if no query is provided
+      try {
+        const indexPath = path.resolve("index.html");
+        const content = fs.readFileSync(indexPath, "utf-8");
+        res.setHeader("content-type", "text/html; charset=utf-8");
+        res.statusCode = 200;
+        res.end(content);
+        return;
+      } catch (err) {
+        return sendJson(res, 500, { error: "Failed to load UI" });
+      }
     }
 
     if (pathname === "/api/scrape") {
@@ -72,7 +87,8 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (pathname === "/api/latest-poster" || pathname === "/latest-poster.jpg") {
-      return await latestPosterHandler({}, resShim);
+      const json = requestUrl.searchParams.get("json");
+      return await latestPosterHandler({ query: { json } }, resShim);
     }
 
     if (pathname.startsWith("/api/poster/")) {
@@ -87,8 +103,24 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (pathname.startsWith("/poster/")) {
-      const title = pathname.split("/").pop();
-      return await posterByTitleHandler({ query: { title } }, resShim);
+      let title = pathname.split("/").pop();
+      if (title.endsWith(".jpg")) title = title.slice(0, -4);
+      return await posterImgHandler({ query: { title } }, resShim);
+    }
+
+    // Serve static files (app.js)
+    try {
+      const safePath = pathname.startsWith("/") ? pathname.slice(1) : pathname;
+      if (safePath === "app.js") {
+        const filePath = path.resolve(safePath);
+        const content = fs.readFileSync(filePath, "utf-8");
+        res.setHeader("content-type", "application/javascript; charset=utf-8");
+        res.statusCode = 200;
+        res.end(content);
+        return;
+      }
+    } catch (err) {
+      // Ignore and fall through to 404
     }
 
     return sendJson(res, 404, { error: "Not found" });

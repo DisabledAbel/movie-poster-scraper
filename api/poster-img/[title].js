@@ -13,11 +13,15 @@ export default async function handler(req, res) {
 
     if (posters && posters.length > 0) {
       const bestPoster = posters[0];
-      saveLatestPoster(cleanTitle, bestPoster);
+      const bestPosterUrl = typeof bestPoster === "string" ? bestPoster : bestPoster?.url;
 
-      // Redirect to the actual image URL
-      res.setHeader("Cache-Control", "public, max-age=86400"); // Cache for 24 hours
-      return res.redirect(307, bestPoster);
+      if (bestPosterUrl) {
+        saveLatestPoster(cleanTitle, bestPosterUrl);
+
+        // Redirect to the actual image URL
+        res.setHeader("Cache-Control", "public, max-age=86400"); // Cache for 24 hours
+        return res.redirect(307, bestPosterUrl);
+      }
     }
 
     res.status(404).json({ error: "Poster not found" });
