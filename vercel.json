@@ -14,6 +14,10 @@
     {
       "source": "/poster-img/:title.jpg",
       "destination": "/api/poster-img/:title"
+    },
+    {
+      "source": "/latest-poster.jpg",
+      "destination": "/api/latest-poster"
     }
   ]
 }

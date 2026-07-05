@@ -1,5 +1,6 @@
 import { normalizeYear } from "../lib/poster-utils.js";
 import { findPostersSequential } from "../lib/providers.js";
+import { saveLatestPoster } from "../lib/cache-utils.js";
 
 export default async function handler(req, res) {
   try {
@@ -17,6 +18,7 @@ export default async function handler(req, res) {
     const { posters, source, sourcesTried } = await findPostersSequential(query, year);
 
     if (posters && posters.length > 0) {
+      saveLatestPoster(query, posters[0]);
       return res.status(200).json({
         query,
         posters,
