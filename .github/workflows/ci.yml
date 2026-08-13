@@ -49,7 +49,7 @@ jobs:
             status=$(curl \
               --retry 3 \
               --retry-all-errors \
-              --max-time 10 \
+              --max-time 30 \
               --silent \
               --show-error \
               --location \

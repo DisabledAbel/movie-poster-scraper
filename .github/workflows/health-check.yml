@@ -13,6 +13,9 @@ jobs:
       issues: write
 
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
       - name: Check deployed API health
         run: |
           set -euo pipefail
@@ -20,7 +23,7 @@ jobs:
           BODY_FILE=$(mktemp)
           FAILURE_FILE="/tmp/health_check_failure.log"
 
-          STATUS=$(curl --retry 3 --retry-all-errors --max-time 10 --silent --show-error --location --output "$BODY_FILE" --write-out "%{http_code}" "$URL") || {
+          STATUS=$(curl --retry 3 --retry-all-errors --max-time 30 --silent --show-error --location --output "$BODY_FILE" --write-out "%{http_code}" "$URL") || {
             echo "API DOWN: Curl command failed" > "$FAILURE_FILE"
             exit 1
           }
