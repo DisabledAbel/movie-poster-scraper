@@ -51,6 +51,9 @@ Set:
 
 ```text
 FIRECRAWL_API_KEY=your_firecrawl_api_key_here
+# Optional sequential-search deadlines in milliseconds:
+PROVIDER_TIMEOUT_MS=5000
+POSTER_SEARCH_TIMEOUT_MS=25000
 ```
 
 ### 4) Start locally
@@ -120,7 +123,11 @@ Optionally, set `FIRECRAWL_API_KEY` to include Firecrawl as an additional source
 
 ```text
 FIRECRAWL_API_KEY
+PROVIDER_TIMEOUT_MS
+POSTER_SEARCH_TIMEOUT_MS
 ```
+
+The timeout variables are optional and default to 5 seconds per provider and 25 seconds for the complete sequential search. This leaves response time for the API before Vercel's 30-second function limit.
 
 Value: your Firecrawl API key.
 **When FIRECRAWL_API_KEY is missing, the app falls back to IMDb/iTunes/Wikipedia sources.**
