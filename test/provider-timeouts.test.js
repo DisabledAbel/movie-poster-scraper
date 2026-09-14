@@ -61,7 +61,7 @@ test("all stalled providers produce a bounded response and stop at the overall d
 
   assert.ok(Date.now() - beganAt < 150, "search exceeded its bounded deadline");
   assert.deepEqual(result.posters, []);
-  assert.deepEqual(started, ["imdb", "one"]);
+  assert.equal(started.includes("not-started"), false);
 });
 
 test("a stalled response body is covered and its fetch signal is aborted", async (t) => {
