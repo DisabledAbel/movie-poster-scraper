@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import fs from "fs";
 import path from "path";
 import { findPostersSequential } from "../../lib/providers.js";
@@ -12,7 +13,8 @@ export function createPosterHandler({
     const title = req.query.title;
     if (!title) return res.status(400).json({ error: "Missing title" });
 
-    const safeFile = path.join(cacheDir, `${title.toLowerCase()}.json`);
+    const cacheKey = createHash("sha256").update(title).digest("hex");
+    const safeFile = path.join(cacheDir, `${cacheKey}.json`);
 
     try {
       const data = JSON.parse(fileSystem.readFileSync(safeFile, "utf-8"));
