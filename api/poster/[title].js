@@ -1,29 +1,42 @@
 import fs from "fs";
 import path from "path";
 import { findPostersSequential } from "../../lib/providers.js";
+import { getCacheDirectory } from "../../lib/cache-utils.js";
 
-const CACHE_DIR = path.resolve(".cache");
-if (!fs.existsSync(CACHE_DIR)) fs.mkdirSync(CACHE_DIR);
-
-export default async function handler(req, res) {
-  try {
+export function createPosterHandler({
+  findPosters = findPostersSequential,
+  cacheDir = getCacheDirectory(),
+  fileSystem = fs,
+} = {}) {
+  return async function handler(req, res) {
     const title = req.query.title;
     if (!title) return res.status(400).json({ error: "Missing title" });
 
-    const safeFile = path.join(CACHE_DIR, `${title.toLowerCase()}.json`);
+    const safeFile = path.join(cacheDir, `${title.toLowerCase()}.json`);
 
-    if (fs.existsSync(safeFile)) {
-      const data = JSON.parse(fs.readFileSync(safeFile, "utf-8"));
+    try {
+      const data = JSON.parse(fileSystem.readFileSync(safeFile, "utf-8"));
       return res.status(200).json(data);
+    } catch (err) {
+      // A cache miss or an unreadable/malformed entry must not affect the lookup.
     }
 
-    const result = await findPostersSequential(title, null);
-    const payload = { title, ...result };
+    try {
+      const result = await findPosters(title, null);
+      const payload = { title, ...result };
 
-    fs.writeFileSync(safeFile, JSON.stringify(payload));
+      try {
+        fileSystem.mkdirSync(cacheDir, { recursive: true });
+        fileSystem.writeFileSync(safeFile, JSON.stringify(payload));
+      } catch (err) {
+        // Caching is best-effort; the provider result is still a successful response.
+      }
 
-    res.status(200).json(payload);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
+      return res.status(200).json(payload);
+    } catch (err) {
+      return res.status(500).json({ error: err.message });
+    }
+  };
 }
+
+export default createPosterHandler();

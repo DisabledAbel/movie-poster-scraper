@@ -6,6 +6,7 @@
     "@mendable/firecrawl-js": "^1.5.0"
   },
   "scripts": {
+    "test": "node --test",
     "dev": "vercel dev --listen 3000",
     "dev:linux": "bash ./scripts/run-local.sh",
     "dev:windows": "powershell -ExecutionPolicy Bypass -File ./scripts/run-local.ps1"
