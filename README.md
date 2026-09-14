@@ -217,7 +217,10 @@ GET /latest-poster.jpg
 ## Caching
 
 * Cached posters are stored in `.cache/` locally.
-* On Vercel, consider using **Vercel KV** or **Edge Config** for persistent caching.
+* On Vercel, cached posters use the operating system's temporary directory because
+  the deployed application filesystem is read-only. This cache is ephemeral, may
+  be discarded between invocations, and is not shared persistent storage.
+* Consider using **Vercel KV** or **Edge Config** if persistent caching is needed.
 
 ---
 
