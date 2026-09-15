@@ -3,6 +3,7 @@ import fs from "fs";
 import path from "path";
 import { findPostersSequential } from "../../lib/providers.js";
 import { getCacheDirectory, getPosterCacheTtlMs } from "../../lib/cache-utils.js";
+import { latestPosterStore, saveLatestPosterSafely } from "../../lib/latest-poster-store.js";
 
 function hasUsablePosters(payload) {
   return payload
@@ -28,6 +29,8 @@ export function createPosterHandler({
   fileSystem = fs,
   cacheTtlMs = getPosterCacheTtlMs(),
   now = Date.now,
+  latestStore = latestPosterStore,
+  logger = console,
 } = {}) {
   return async function handler(req, res) {
     const title = req.query.title;
@@ -39,7 +42,10 @@ export function createPosterHandler({
     try {
       const entry = JSON.parse(fileSystem.readFileSync(safeFile, "utf-8"));
       const payload = readFreshPayload(entry, title, now());
-      if (payload) return res.status(200).json(payload);
+      if (payload) {
+        await saveLatestPosterSafely(latestStore, title, payload.posters[0], logger);
+        return res.status(200).json(payload);
+      }
     } catch (err) {
       // A cache miss or an unreadable/malformed entry must not affect the lookup.
     }
@@ -59,6 +65,7 @@ export function createPosterHandler({
         } catch (err) {
           // Caching is best-effort; the provider result is still a successful response.
         }
+        await saveLatestPosterSafely(latestStore, title, payload.posters[0], logger);
       }
 
       return res.status(200).json(payload);

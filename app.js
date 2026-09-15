@@ -250,7 +250,7 @@
 
       async function fetchLatestPoster() {
         try {
-          const response = await fetch("/api/latest-poster?json=1");
+          const response = await fetch("/api/latest-poster?json=1", { cache: "no-store" });
           if (!response.ok) return;
           const data = await response.json();
           if (data && data.url) {
