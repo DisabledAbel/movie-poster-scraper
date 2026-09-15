@@ -8,6 +8,8 @@ jobs:
   validate:
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    permissions:
+      contents: read
 
     steps:
       - name: Checkout
@@ -16,82 +18,17 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 18
+          node-version: 22
+          cache: npm
 
       - name: Install dependencies
-        run: npm install
+        run: npm ci
 
       - name: Run lint if available
-        run: npm run lint || true
+        run: npm run --if-present lint
 
       - name: Run build if available
-        run: npm run build || true
+        run: npm run --if-present build
 
-      - name: Test Vercel API endpoints
-        run: |
-          set -euo pipefail
-
-          test_endpoint() {
-            local query="$1"
-
-            # URL encode using Python (always available)
-            local encoded_query
-            encoded_query=$(python3 -c "import urllib.parse, sys; print(urllib.parse.quote(sys.argv[1]))" "$query")
-
-            local url="https://movie-poster-scraper.vercel.app/api/search?query=$encoded_query"
-
-            echo "Testing: $url"
-
-            local body_file
-            body_file=$(mktemp)
-
-            local status
-            status=$(curl \
-              --retry 3 \
-              --retry-all-errors \
-              --max-time 30 \
-              --silent \
-              --show-error \
-              --location \
-              --output "$body_file" \
-              --write-out "%{http_code}" \
-              "$url") || {
-                echo "curl failed for $url"
-                exit 1
-              }
-
-            if [ "$status" != "200" ]; then
-              echo "Expected HTTP 200, got $status for $url"
-              echo "--- Response body ---"
-              cat "$body_file"
-              exit 1
-            fi
-
-            if [ ! -s "$body_file" ]; then
-              echo "Empty response body for $url"
-              exit 1
-            fi
-
-            if ! grep -Eiq 'https?://[^"[:space:]]+\.(jpe?g|png|webp|avif)(\?[^"[:space:]]*)?' "$body_file"; then
-              echo "No image URL found in response for $url"
-              echo "--- Response body ---"
-              cat "$body_file"
-              exit 1
-            fi
-          }
-
-          test_endpoint "Frozen"
-          test_endpoint "Tangled"
-          test_endpoint "8 Mile"
-          test_endpoint "Beauty and the Beast"
-
-      - name: Show logs on failure
-        if: failure()
-        run: cat server.log || true
-
-      - name: Stop local server
-        if: always()
-        run: |
-          if [ -f server.pid ]; then
-            kill "$(cat server.pid)" || true
-          fi
+      - name: Run checkout tests
+        run: npm test

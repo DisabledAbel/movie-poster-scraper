@@ -19,8 +19,8 @@ This project provides a **movie poster API** using **Firecrawl** to fetch poster
 
 ### Prerequisites
 
-- Node.js 18+
-- npm 9+
+- Node.js 22+
+- npm 10+
 - Firecrawl API key is optional (when omitted, the scraper falls back to IMDb/iTunes/Wikipedia sources).
 
 ### 1) Clone the repository
@@ -36,7 +36,7 @@ cd movie-poster-scraper
 ### 2) Install dependencies
 
 ```bash
-npm install
+npm ci
 ```
 
 ### 3) Create local environment file
@@ -80,6 +80,25 @@ You can also run the shared command directly on any platform:
 ```bash
 npm run dev
 ```
+
+## Continuous integration
+
+Pushes and pull requests run the following commands against the checked-out
+source on Node.js 22:
+
+```bash
+npm ci
+npm run --if-present lint
+npm run --if-present build
+npm test
+```
+
+Lint and build are optional because this project does not currently define those
+scripts; if either is added, its failures will fail CI. The test suite imports the
+local API handlers and supplies in-memory poster-provider and storage doubles, so
+pull requests do not need API keys, shared-storage credentials, a Vercel login, or
+network access. Monitoring of the deployed service remains in the separate
+`Health Check` workflow.
 
 ---
 
