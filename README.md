@@ -125,9 +125,16 @@ Optionally, set `FIRECRAWL_API_KEY` to include Firecrawl as an additional source
 FIRECRAWL_API_KEY
 PROVIDER_TIMEOUT_MS
 POSTER_SEARCH_TIMEOUT_MS
+POSTER_CACHE_TTL_MS
 ```
 
 The timeout variables are optional and default to 5 seconds per provider and 25 seconds for the complete sequential search. This leaves response time for the API before Vercel's 30-second function limit.
+
+`POSTER_CACHE_TTL_MS` is optional and controls how long successful poster searches
+remain cached, in milliseconds. It must be a positive number and defaults to 24
+hours (`86400000`). Expired, empty, malformed, and legacy cache entries are ignored.
+Empty results and provider failures are not cached, so a later request retries the
+providers. Cache reads and writes remain best-effort.
 
 Value: your Firecrawl API key.
 **When FIRECRAWL_API_KEY is missing, the app falls back to IMDb/iTunes/Wikipedia sources.**
@@ -224,6 +231,9 @@ GET /latest-poster.jpg
 ## Caching
 
 * Cached posters are stored in `.cache/` locally.
+* Only successful searches containing usable poster URLs are cached. Entries expire
+  after `POSTER_CACHE_TTL_MS` (24 hours by default); cache metadata is never included
+  in API responses.
 * On Vercel, cached posters use the operating system's temporary directory because
   the deployed application filesystem is read-only. This cache is ephemeral, may
   be discarded between invocations, and is not shared persistent storage.
