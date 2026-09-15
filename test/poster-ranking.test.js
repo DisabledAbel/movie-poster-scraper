@@ -78,6 +78,39 @@ test("the final sequential merge preserves the relevant IMDb poster first", asyn
   assert.equal(typeof result.posters[0], "string");
 });
 
+test("the sequential merge validates IMDb posters before selecting the first result", async () => {
+  const fallback = image("fallback");
+  const result = await findPostersSequential("Frozen", null, {
+    providers: [
+      { name: "imdb", fetcher: async () => [{ url: "not-an-image", relevance: 2 }] },
+      { name: "itunes", fetcher: async () => [fallback] },
+    ],
+    providerTimeoutMs: 50,
+    overallTimeoutMs: 200,
+  });
+
+  assert.deepEqual(result.posters, [fallback]);
+  assert.equal(result.source, "itunes");
+});
+
+test("the IMDb-first merge removes canonical duplicates and remains limited to 15 posters", async () => {
+  const current = `${image("frozen")}?size=large`;
+  const duplicate = `${image("frozen")}?size=small`;
+  const extras = Array.from({ length: 20 }, (_, index) => image(`extra-${index}`));
+  const result = await findPostersSequential("Frozen", null, {
+    providers: [
+      { name: "imdb", fetcher: async () => [{ url: current, relevance: 2 }] },
+      { name: "itunes", fetcher: async () => [duplicate, ...extras] },
+    ],
+    providerTimeoutMs: 50,
+    overallTimeoutMs: 200,
+  });
+
+  assert.equal(result.posters[0], current);
+  assert.equal(result.posters.includes(duplicate), false);
+  assert.equal(result.posters.length, 15);
+});
+
 test("image quality breaks ties only among equally relevant candidates", () => {
   const ranked = rankPosterCandidates([
     { url: image("plain"), relevance: 2 },
