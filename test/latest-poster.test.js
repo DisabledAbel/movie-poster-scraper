@@ -9,6 +9,7 @@ import {
   createFileLatestPosterAdapter,
   createLatestPosterAdapter,
   createLatestPosterStore,
+  createRedisLatestPosterAdapter,
 } from "../lib/latest-poster-store.js";
 
 function response() {
@@ -132,4 +133,25 @@ test("storage operations are bounded by the configured timeout", async () => {
   const started = Date.now();
   await assert.rejects(store.getLatestPoster(), /storage is unavailable/);
   assert.ok(Date.now() - started < 200, "storage timeout should return promptly");
+});
+
+test("timed-out Redis reads and writes abort the underlying fetch", async () => {
+  const signals = [];
+  const fetchImpl = async (_url, options) => {
+    signals.push(options.signal);
+    return new Promise(() => {});
+  };
+  const store = createLatestPosterStore({
+    adapter: createRedisLatestPosterAdapter({
+      url: "https://redis.example.test",
+      token: "test-token",
+      fetchImpl,
+    }),
+    env: { LATEST_POSTER_STORAGE_TIMEOUT_MS: "10" },
+  });
+
+  await assert.rejects(store.getLatestPoster(), /storage is unavailable/);
+  assert.equal(signals[0].aborted, true);
+  await assert.rejects(store.saveLatestPoster("Alien", "https://images.test/alien.jpg"), /storage is unavailable/);
+  assert.equal(signals[1].aborted, true);
 });
