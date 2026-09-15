@@ -2,6 +2,9 @@
   "name": "movie-poster-scraper",
   "version": "1.0.0",
   "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
   "dependencies": {
     "@mendable/firecrawl-js": "^1.5.0"
   },
