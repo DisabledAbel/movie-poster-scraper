@@ -126,6 +126,10 @@ FIRECRAWL_API_KEY
 PROVIDER_TIMEOUT_MS
 POSTER_SEARCH_TIMEOUT_MS
 POSTER_CACHE_TTL_MS
+KV_REST_API_URL
+KV_REST_API_TOKEN
+LATEST_POSTER_STORAGE_TIMEOUT_MS
+LATEST_POSTER_REDIS_KEY
 ```
 
 The timeout variables are optional and default to 5 seconds per provider and 25 seconds for the complete sequential search. This leaves response time for the API before Vercel's 30-second function limit.
@@ -135,6 +139,17 @@ remain cached, in milliseconds. It must be a positive number and defaults to 24
 hours (`86400000`). Expired, empty, malformed, and legacy cache entries are ignored.
 Empty results and provider failures are not cached, so a later request retries the
 providers. Cache reads and writes remain best-effort.
+
+`KV_REST_API_URL` and `KV_REST_API_TOKEN` configure the Redis-compatible REST store
+used for the application-wide latest-poster record. Vercel KV variables are used
+directly; `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` are also accepted.
+The store must support the Upstash Redis REST `GET` and `SET` command endpoints.
+Production deployments intentionally return a controlled 503 from the latest-poster
+endpoint when shared storage is missing or unavailable instead of falling back to
+an instance-local file. `LATEST_POSTER_STORAGE_TIMEOUT_MS` is optional and defaults
+to 2000 ms; `LATEST_POSTER_REDIS_KEY` optionally changes the shared key. These
+values are server-side secrets/settings and must not be added to browser code or
+committed with real credentials.
 
 Value: your Firecrawl API key.
 **When FIRECRAWL_API_KEY is missing, the app falls back to IMDb/iTunes/Wikipedia sources.**
@@ -226,6 +241,10 @@ GET /latest-poster.jpg
 
 **Behavior:** Redirects to the last successfully searched movie poster. Useful for dynamic displays or automated updates without specifying a title.
 
+`GET /api/latest-poster?json=1` returns the same record as JSON, including `title`,
+`url`, and `timestamp`. Both JSON and redirect responses disable browser and CDN
+caching so callers see the current shared record.
+
 ---
 
 ## Caching
@@ -237,7 +256,9 @@ GET /latest-poster.jpg
 * On Vercel, cached posters use the operating system's temporary directory because
   the deployed application filesystem is read-only. This cache is ephemeral, may
   be discarded between invocations, and is not shared persistent storage.
-* Consider using **Vercel KV** or **Edge Config** if persistent caching is needed.
+* Latest-poster state is separate: deployed environments require the shared Redis
+  REST configuration above. Local development needs no Redis credentials and uses
+  `.cache/latest.json`, allowing state to survive local process restarts.
 
 ---
 
