@@ -7,9 +7,9 @@ This project provides a **movie poster API** using **Firecrawl** to fetch poster
 ## Features
 
 * Search for movie posters by title
-* Returns multiple poster URLs as JSON
+* Returns poster URLs for one matching movie as JSON
 * Optional caching for repeated requests
-* Multi-source fallback chain (Firecrawl → IMDb → iTunes → Wikipedia)
+* IMDb-first search with additional matching posters from TMDB (optional), Firecrawl (optional), iTunes, and Wikipedia
 * CDN-style direct image URL endpoints for Plex or apps
 
 ---
@@ -131,6 +131,12 @@ node firecrawl-movie-posters.js "The Matrix" --save --index 1
 
 Optionally, set `FIRECRAWL_API_KEY` to include Firecrawl as an additional source, but it is not required for CLI usage.
 
+Specify the release year to distinguish remakes:
+
+```bash
+node firecrawl-movie-posters.js "The Thing" --year 1982 --save
+```
+
 ---
 
 ## Deployment on Vercel
@@ -197,7 +203,17 @@ GET /api/scrape?movie=avatar
 GET /api/scrape?movie=the+thing&year=1982
 ```
 
-`year` is optional and helps disambiguate movies with the same title.
+`year` is optional and strictly selects that release. Titles must match after
+normalizing case, whitespace, and punctuation; sequel numbers remain significant.
+Unrelated search hits and wrong-year movies are excluded rather than returned as
+extra poster options. Without a year, the search chooses one matching release,
+preferring IMDb, and keeps additional posters on that release. Supply a year when
+you want a particular remake.
+
+The API returns up to 15 verified matching URLs, which may be fewer than 15.
+Firecrawl uses structured extraction with a title and release year for each poster;
+unidentified page images and recommendation links are ignored. TMDB backdrops and
+Wikipedia disambiguation pages are excluded.
 
 **Response:**
 
@@ -222,6 +238,7 @@ Returns cached or freshly scraped poster URLs for `{title}`:
 
 ```text
 GET /api/poster/inception
+GET /api/poster/the%20thing?year=1982
 ```
 
 **Response:**
@@ -246,6 +263,7 @@ Returns **first poster image** as direct URL (ideal for Plex):
 
 ```text
 GET /api/poster-img/inception.jpg
+GET /api/poster-img/the%20thing.jpg?year=1982
 ```
 
 **Behavior:** Redirects to the poster image URL. Plex or apps can fetch directly.
@@ -272,6 +290,8 @@ caching so callers see the current shared record.
 * Only successful searches containing usable poster URLs are cached. Entries expire
   after `POSTER_CACHE_TTL_MS` (24 hours by default); cache metadata is never included
   in API responses.
+* Cache entries are versioned so results from the older broad matching behavior are
+  refreshed automatically. Requests for different release years use separate entries.
 * On Vercel, cached posters use the operating system's temporary directory because
   the deployed application filesystem is read-only. This cache is ephemeral, may
   be discarded between invocations, and is not shared persistent storage.

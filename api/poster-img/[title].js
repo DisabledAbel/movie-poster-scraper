@@ -1,4 +1,5 @@
 import { findPostersSequential } from "../../lib/providers.js";
+import { normalizeYear } from "../../lib/poster-utils.js";
 import { latestPosterStore, saveLatestPosterSafely } from "../../lib/latest-poster-store.js";
 
 export function createPosterImageHandler({ findPosters = findPostersSequential, store = latestPosterStore, logger = console } = {}) {
@@ -10,7 +11,7 @@ export function createPosterImageHandler({ findPosters = findPostersSequential, 
     // Remove .jpg extension if present (for Plex-style URLs)
     const cleanTitle = title.replace(/\.jpg$/i, "");
 
-    const { posters } = await findPosters(cleanTitle, null);
+    const { posters } = await findPosters(cleanTitle, normalizeYear(req.query.year));
 
     if (posters && posters.length > 0) {
       const bestPoster = posters[0];

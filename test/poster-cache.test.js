@@ -9,6 +9,7 @@ import { pathToFileURL } from "node:url";
 import { createPosterHandler } from "../api/poster/[title].js";
 import {
   DEFAULT_POSTER_CACHE_TTL_MS,
+  POSTER_CACHE_VERSION,
   getCacheDirectory,
   getPosterCacheTtlMs,
 } from "../lib/cache-utils.js";
@@ -22,9 +23,9 @@ function response() {
   };
 }
 
-async function request(handler, title = "Alien") {
+async function request(handler, title = "Alien", year = null) {
   const res = response();
-  await handler({ query: { title } }, res);
+  await handler({ query: { title, year } }, res);
   return res;
 }
 
@@ -36,6 +37,8 @@ function cacheFile(cacheDir, title = "Alien") {
 function writeCacheEntry(cacheDir, payload, expiresAt) {
   fs.mkdirSync(cacheDir, { recursive: true });
   fs.writeFileSync(cacheFile(cacheDir, payload?.title || "Alien"), JSON.stringify({
+    version: POSTER_CACHE_VERSION,
+    year: null,
     expiresAt,
     payload,
   }));
@@ -100,6 +103,8 @@ test("an expired entry triggers a fresh lookup and is replaced after success", a
   assert.deepEqual((await request(handler)).body, { title: "Alien", posters: ["fresh"] });
   assert.equal(calls, 1);
   assert.deepEqual(JSON.parse(fs.readFileSync(cacheFile(cacheDir), "utf8")), {
+    version: POSTER_CACHE_VERSION,
+    year: null,
     expiresAt: "2026-09-15T00:00:01.000Z",
     payload: { title: "Alien", posters: ["fresh"] },
   });
@@ -134,10 +139,12 @@ for (const [cacheState, contents] of [
   ["invalid timestamp", { expiresAt: "not-a-date", payload: { title: "Alien", posters: ["stale"] } }],
   ["legacy", { title: "Alien", posters: ["stale"] }],
   ["malformed payload", { expiresAt: "2026-09-16T00:00:00.000Z", payload: "invalid" }],
+  ["unversioned mixed-movie results", { version: undefined, expiresAt: "2026-09-16T00:00:00.000Z", payload: { title: "Alien", posters: ["wrong-movie"] } }],
+  ["old matching version", { version: 1, expiresAt: "2026-09-16T00:00:00.000Z", payload: { title: "Alien", posters: ["wrong-movie"] } }],
 ]) {
   test(`existing ${cacheState} cache entry is ignored`, async () => {
     const cacheDir = fs.mkdtempSync(path.join(os.tmpdir(), "poster-invalid-"));
-    fs.writeFileSync(cacheFile(cacheDir), JSON.stringify(contents));
+    fs.writeFileSync(cacheFile(cacheDir), JSON.stringify({ version: POSTER_CACHE_VERSION, year: null, ...contents }));
     let calls = 0;
     const handler = createPosterHandler({
       cacheDir,
@@ -237,4 +244,28 @@ test("cache filenames do not expose titles or escape the cache directory", async
   assert.deepEqual(fs.readdirSync(cacheDir), [path.basename(cacheFile(cacheDir, title))]);
   assert.equal(fs.existsSync(path.join(parent, "Sensitive Movie.json")), false);
   fs.rmSync(parent, { recursive: true, force: true });
+});
+
+test("different release years and title-only requests have separate reusable caches", async (t) => {
+  const cacheDir = fs.mkdtempSync(path.join(os.tmpdir(), "poster-release-"));
+  t.after(() => fs.rmSync(cacheDir, { recursive: true, force: true }));
+  const lookups = [];
+  const handler = createPosterHandler({
+    cacheDir,
+    findPosters: async (title, year) => {
+      lookups.push({ title, year });
+      return { posters: [`https://images.example.com/thing-${year ?? "default"}.jpg`] };
+    },
+  });
+  for (const year of [1982, 2011, null, 1982, 2011, null]) {
+    const result = await request(handler, "The Thing", year === null ? null : String(year));
+    assert.equal(result.statusCode, 200);
+    assert.deepEqual(result.body.posters, [`https://images.example.com/thing-${year ?? "default"}.jpg`]);
+  }
+  assert.deepEqual(lookups, [
+    { title: "The Thing", year: 1982 },
+    { title: "The Thing", year: 2011 },
+    { title: "The Thing", year: null },
+  ]);
+  assert.equal(fs.readdirSync(cacheDir).length, 3);
 });

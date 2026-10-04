@@ -92,20 +92,23 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (pathname.startsWith("/api/poster/")) {
-      const title = pathname.split("/").pop();
-      return await posterByTitleHandler({ query: { title } }, resShim);
+      const title = decodeURIComponent(pathname.split("/").pop());
+      const year = requestUrl.searchParams.get("year");
+      return await posterByTitleHandler({ query: { title, year } }, resShim);
     }
 
     if (pathname.startsWith("/api/poster-img/") || pathname.startsWith("/poster-img/")) {
-      let title = pathname.split("/").pop();
+      let title = decodeURIComponent(pathname.split("/").pop());
       if (title.endsWith(".jpg")) title = title.slice(0, -4);
-      return await posterImgHandler({ query: { title } }, resShim);
+      const year = requestUrl.searchParams.get("year");
+      return await posterImgHandler({ query: { title, year } }, resShim);
     }
 
     if (pathname.startsWith("/poster/")) {
-      let title = pathname.split("/").pop();
+      let title = decodeURIComponent(pathname.split("/").pop());
       if (title.endsWith(".jpg")) title = title.slice(0, -4);
-      return await posterImgHandler({ query: { title } }, resShim);
+      const year = requestUrl.searchParams.get("year");
+      return await posterImgHandler({ query: { title, year } }, resShim);
     }
 
     // Serve static files (app.js)
