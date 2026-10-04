@@ -9,7 +9,7 @@ This project provides a **movie poster API** using **Firecrawl** to fetch poster
 * Search for movie posters by title
 * Returns poster URLs for one matching movie as JSON
 * Optional caching for repeated requests
-* IMDb-first search with additional matching posters from TMDB (optional), Firecrawl (optional), iTunes, and Wikipedia
+* IMDb-first search with up to 15 distinct matching posters, including alternate designs from TMDB galleries (optional), Firecrawl galleries (optional), iTunes, and Wikipedia
 * CDN-style direct image URL endpoints for Plex or apps
 
 ---
@@ -21,7 +21,7 @@ This project provides a **movie poster API** using **Firecrawl** to fetch poster
 
 - Node.js 22+
 - npm 10+
-- Firecrawl API key is optional (when omitted, the scraper falls back to IMDb/iTunes/Wikipedia sources).
+- Firecrawl and TMDB API keys are optional. Set `TMDB_API_KEY` to collect alternate designs from the selected movie's poster gallery, or `FIRECRAWL_API_KEY` to extract posters from web galleries. IMDb/iTunes/Wikipedia generally supply only the main poster.
 
 ### 1) Clone the repository
 
@@ -51,8 +51,10 @@ Set:
 
 ```text
 FIRECRAWL_API_KEY=your_firecrawl_api_key_here
+TMDB_API_KEY=your_tmdb_api_key_here
 # Optional sequential-search deadlines in milliseconds:
 PROVIDER_TIMEOUT_MS=5000
+FIRECRAWL_TIMEOUT_MS=15000
 POSTER_SEARCH_TIMEOUT_MS=25000
 ```
 
@@ -148,7 +150,9 @@ node firecrawl-movie-posters.js "The Thing" --year 1982 --save
 
 ```text
 FIRECRAWL_API_KEY
+TMDB_API_KEY
 PROVIDER_TIMEOUT_MS
+FIRECRAWL_TIMEOUT_MS
 POSTER_SEARCH_TIMEOUT_MS
 POSTER_CACHE_TTL_MS
 KV_REST_API_URL
@@ -157,7 +161,7 @@ LATEST_POSTER_STORAGE_TIMEOUT_MS
 LATEST_POSTER_REDIS_KEY
 ```
 
-The timeout variables are optional and default to 5 seconds per provider and 25 seconds for the complete sequential search. This leaves response time for the API before Vercel's 30-second function limit.
+The timeout variables are optional and default to 5 seconds per provider, 15 seconds for Firecrawl gallery extraction, and 25 seconds for the complete search. `PROVIDER_TIMEOUT_MS` overrides the per-provider default; `FIRECRAWL_TIMEOUT_MS` overrides it for Firecrawl. Sequential searches collect the fast sources before Firecrawl, whose timeout is also capped by the remaining search budget. This leaves response time for the API before Vercel's 30-second function limit.
 
 `POSTER_CACHE_TTL_MS` is optional and controls how long successful poster searches
 remain cached, in milliseconds. It must be a positive number and defaults to 24
@@ -177,7 +181,7 @@ values are server-side secrets/settings and must not be added to browser code or
 committed with real credentials.
 
 Value: your Firecrawl API key.
-**When FIRECRAWL_API_KEY is missing, the app falls back to IMDb/iTunes/Wikipedia sources.**
+**Without Firecrawl or TMDB keys, the app uses IMDb/iTunes/Wikipedia and may find only one or two posters. Set either gallery provider's key for more alternate designs; availability varies by movie.**
 
 4. Deploy. Your API will be available at:
 

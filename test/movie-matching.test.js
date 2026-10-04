@@ -98,7 +98,6 @@ test("TMDB returns posters for one title instead of the first three search match
     { id: 1, title: "Frozen", release_date: "2013-01-01", poster_path: "/frozen.jpg", backdrop_path: "/backdrop.jpg" },
   ] });
   assert.deepEqual(new Set(urls(await fetchTmdbPosterCandidates("Frozen", null))), new Set([
-    "https://image.tmdb.org/t/p/w500/frozen.jpg",
     "https://image.tmdb.org/t/p/original/frozen.jpg",
   ]));
   assert.equal(await fetchTmdbSinglePoster("Frozen", 2014), null);
@@ -114,7 +113,7 @@ test("TMDB accepts an exact original title but rejects a wrong-title same-year r
     { id: 1, title: "Spirited Away", original_title: "千と千尋の神隠し", release_date: "2001-01-01", poster_path: "/correct.jpg" },
   ] });
   const matching = urls(await fetchTmdbPosterCandidates("千と千尋の神隠し", 2001));
-  assert.equal(matching.length, 2);
+  assert.equal(matching.length, 1);
   assert.ok(matching.every((url) => url.endsWith("/correct.jpg")));
   assert.deepEqual(await fetchTmdbPosterCandidates("Missing Movie", 2001), []);
 });
