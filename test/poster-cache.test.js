@@ -141,6 +141,7 @@ for (const [cacheState, contents] of [
   ["malformed payload", { expiresAt: "2026-09-16T00:00:00.000Z", payload: "invalid" }],
   ["unversioned mixed-movie results", { version: undefined, expiresAt: "2026-09-16T00:00:00.000Z", payload: { title: "Alien", posters: ["wrong-movie"] } }],
   ["old matching version", { version: 1, expiresAt: "2026-09-16T00:00:00.000Z", payload: { title: "Alien", posters: ["wrong-movie"] } }],
+  ["single-thumbnail version", { version: 2, expiresAt: "2026-09-16T00:00:00.000Z", payload: { title: "Alien", posters: ["main-poster"] } }],
 ]) {
   test(`existing ${cacheState} cache entry is ignored`, async () => {
     const cacheDir = fs.mkdtempSync(path.join(os.tmpdir(), "poster-invalid-"));
