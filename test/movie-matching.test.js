@@ -225,3 +225,15 @@ test("the sequential lookup passes the IMDb release to subsequent provider searc
   }));
   assert.deepEqual(new Set((await findPostersSequential("The Thing", null)).posters), new Set([image("tt1"), image("1")]));
 });
+
+test("the final sequential merge retains the release selected during the provider loop", async () => {
+  const legacy = image("large-original-poster-2000x3000");
+  let subsequentYear;
+  const result = await findPostersSequential("The Thing", null, { providers: [
+    { name: "imdb", fetcher: async () => [legacy, { url: image("1982"), title: "The Thing", year: 1982 }] },
+    { name: "tmdb", fetcher: async () => [{ url: image("2011"), title: "The Thing", year: 2011 }] },
+    { name: "itunes", fetcher: async ({ year }) => { subsequentYear = year; return []; } },
+  ] });
+  assert.equal(subsequentYear, 2011);
+  assert.deepEqual(result.posters, [legacy, image("2011")]);
+});
