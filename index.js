@@ -16,6 +16,16 @@ function sendJson(res, statusCode, payload) {
   res.end(JSON.stringify(payload));
 }
 
+function decodePosterTitle(pathname, res) {
+  try {
+    return decodeURIComponent(pathname.split("/").pop());
+  } catch (error) {
+    if (!(error instanceof URIError)) throw error;
+    sendJson(res, 400, { error: "Invalid title encoding" });
+    return null;
+  }
+}
+
 const server = http.createServer(async (req, res) => {
   try {
     const requestUrl = new URL(req.url || "/", `http://${req.headers.host || "localhost"}`);
@@ -92,20 +102,23 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (pathname.startsWith("/api/poster/")) {
-      const title = decodeURIComponent(pathname.split("/").pop());
+      const title = decodePosterTitle(pathname, res);
+      if (title === null) return;
       const year = requestUrl.searchParams.get("year");
       return await posterByTitleHandler({ query: { title, year } }, resShim);
     }
 
     if (pathname.startsWith("/api/poster-img/") || pathname.startsWith("/poster-img/")) {
-      let title = decodeURIComponent(pathname.split("/").pop());
+      let title = decodePosterTitle(pathname, res);
+      if (title === null) return;
       if (title.endsWith(".jpg")) title = title.slice(0, -4);
       const year = requestUrl.searchParams.get("year");
       return await posterImgHandler({ query: { title, year } }, resShim);
     }
 
     if (pathname.startsWith("/poster/")) {
-      let title = decodeURIComponent(pathname.split("/").pop());
+      let title = decodePosterTitle(pathname, res);
+      if (title === null) return;
       if (title.endsWith(".jpg")) title = title.slice(0, -4);
       const year = requestUrl.searchParams.get("year");
       return await posterImgHandler({ query: { title, year } }, resShim);
