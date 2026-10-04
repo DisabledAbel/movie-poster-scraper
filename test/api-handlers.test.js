@@ -3,6 +3,7 @@ import test from "node:test";
 
 import { createLatestPosterHandler } from "../api/latest-poster.js";
 import { createSearchHandler } from "../api/search.js";
+import { createPosterImageHandler } from "../api/poster-img/[title].js";
 
 function createResponse() {
   return {
@@ -140,4 +141,20 @@ test("latest-poster redirects to the exact URL held in mocked shared storage", a
   const json = await invoke(handler, { query: { json: "1" } });
   assert.equal(json.statusCode, 200);
   assert.deepEqual(json.body, poster);
+});
+
+test("direct poster image URLs forward the requested release year", async () => {
+  const posterUrl = "https://images.example.test/the-thing-1982.jpg";
+  const handler = createPosterImageHandler({
+    store: memoryStore(),
+    logger: quietLogger,
+    findPosters: async (title, year) => {
+      assert.equal(title, "The Thing");
+      assert.equal(year, 1982);
+      return { posters: [posterUrl] };
+    },
+  });
+  const res = await invoke(handler, { query: { title: "The Thing.jpg", year: "1982" } });
+  assert.equal(res.statusCode, 307);
+  assert.equal(res.redirectUrl, posterUrl);
 });

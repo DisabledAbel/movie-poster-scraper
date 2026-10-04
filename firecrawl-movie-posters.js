@@ -13,58 +13,23 @@
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
-import { sortAndLimit } from "./lib/poster-utils.js";
-import {
-  fetchFirecrawlPosterCandidates,
-  fetchImdbPosterCandidates,
-  fetchItunesPosterCandidates,
-  fetchWikipediaPosterCandidates,
-} from "./lib/providers.js";
+import { normalizeYear } from "./lib/poster-utils.js";
+import { findPostersSequential } from "./lib/providers.js";
 
 /**
  * Search providers for movie posters and return the top 15 JPG URLs.
  * Firecrawl is optional and used only when FIRECRAWL_API_KEY is set.
  * @param {string} title
+ * @param {number|null} year
  * @returns {Promise<string[]>}
  */
-async function getMoviePosters(title) {
+async function getMoviePosters(title, year = null) {
   if (!title || !title.trim()) {
     throw new Error("A movie title is required.");
   }
 
-  const allCandidates = [];
-
-  if (process.env.FIRECRAWL_API_KEY) {
-    try {
-      const firecrawlCandidates = await fetchFirecrawlPosterCandidates(title, null);
-      allCandidates.push(...firecrawlCandidates);
-    } catch (error) {
-      console.error(`Firecrawl source failed: ${error.message}`);
-    }
-  }
-
-  try {
-    const imdbCandidates = await fetchImdbPosterCandidates(title, null);
-    allCandidates.push(...imdbCandidates);
-  } catch (error) {
-    console.error(`IMDb source failed: ${error.message}`);
-  }
-
-  try {
-    const itunesCandidates = await fetchItunesPosterCandidates(title, null);
-    allCandidates.push(...itunesCandidates);
-  } catch (error) {
-    console.error(`iTunes source failed: ${error.message}`);
-  }
-
-  try {
-    const wikipediaCandidates = await fetchWikipediaPosterCandidates(title, null);
-    allCandidates.push(...wikipediaCandidates);
-  } catch (error) {
-    console.error(`Wikipedia source failed: ${error.message}`);
-  }
-
-  return sortAndLimit(allCandidates);
+  const { posters } = await findPostersSequential(title.trim(), year);
+  return posters.filter((url) => /\.jpe?g(?:$|[?#])/i.test(url));
 }
 
 function sanitizeForFilename(value) {
@@ -106,6 +71,7 @@ function parseCliArgs(argv) {
     save: false,
     output: null,
     index: 0,
+    year: null,
   };
   const titleParts = [];
 
@@ -141,6 +107,15 @@ function parseCliArgs(argv) {
       continue;
     }
 
+    if (token === "--year") {
+      const value = argv[i + 1];
+      const year = /^\d{4}$/.test(value || "") ? normalizeYear(value) : null;
+      if (year === null) throw new Error("--year must be a four-digit release year between 1888 and 3000");
+      options.year = year;
+      i += 1;
+      continue;
+    }
+
     titleParts.push(token);
   }
 
@@ -159,7 +134,7 @@ if (isExecutedDirectly) {
   (async () => {
     try {
       const { title, options } = parseCliArgs(process.argv.slice(2));
-      const posters = await getMoviePosters(title);
+      const posters = await getMoviePosters(title, options.year);
 
       if (!posters.length) {
         console.log(`No JPG posters found for "${title}".`);
